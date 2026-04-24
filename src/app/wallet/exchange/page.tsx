@@ -3,29 +3,34 @@
 import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/state/session";
-import { deriveEvmAccount } from "@/lib/wallet/derive";
-import { defaultNetwork } from "@/lib/wallet/networks";
+import { useSettings } from "@/lib/wallet/settings";
+import { deriveAccount } from "@/lib/wallet/derive";
+import { getNetwork } from "@/lib/wallet/networks";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import ExchangeForm from "@/components/ExchangeForm";
-import type { Hex } from "viem";
+import type { Hex, Address } from "viem";
 
 export default function ExchangePage() {
   const { mnemonic, isUnlocked } = useSession();
+  const { getActiveNetworkKeys } = useSettings();
   const router = useRouter();
-  const [networkKey, setNetworkKey] = useState(defaultNetwork);
+  const activeKeys = getActiveNetworkKeys();
+  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
   }, [isUnlocked, router]);
 
+  const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveEvmAccount(mnemonic);
+      return deriveAccount(mnemonic, network.chainType);
     } catch {
       return null;
     }
-  }, [mnemonic]);
+  }, [mnemonic, network.chainType]);
 
   if (!isUnlocked || !account) return null;
 
@@ -45,12 +50,12 @@ export default function ExchangePage() {
       </div>
 
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Swap tokens across Ethereum, Arbitrum, and Avalanche via LI.FI.
+        Swap tokens across Ethereum, Arbitrum, Avalanche, and Solana via LI.FI.
         A 0.5% integrator fee is included in quotes.
       </p>
 
       <ExchangeForm
-        address={account.address}
+        address={account.address as Address}
         privateKey={account.privateKey as Hex}
         currentNetwork={networkKey}
       />

@@ -7,7 +7,7 @@ interface PriceCache {
 
 let cache: PriceCache | null = null;
 
-const COINGECKO_IDS = ["ethereum", "avalanche-2", "arbitrum", "tether"];
+const COINGECKO_IDS = ["ethereum", "avalanche-2", "arbitrum", "tether", "solana"];
 
 export async function fetchPrices(): Promise<Record<string, number>> {
   if (cache && Date.now() - cache.timestamp < CACHE_TTL) {
@@ -28,11 +28,12 @@ export async function fetchPrices(): Promise<Record<string, number>> {
       AVAX: data["avalanche-2"]?.usd ?? 0,
       ARB: data.arbitrum?.usd ?? 0,
       USDT: data.tether?.usd ?? 1,
+      SOL: data.solana?.usd ?? 0,
     };
 
     cache = { prices, timestamp: Date.now() };
     return prices;
   } catch {
-    return cache?.prices ?? { ETH: 0, AVAX: 0, ARB: 0, USDT: 1 };
+    return cache?.prices ?? { ETH: 0, AVAX: 0, ARB: 0, USDT: 1, SOL: 0 };
   }
 }

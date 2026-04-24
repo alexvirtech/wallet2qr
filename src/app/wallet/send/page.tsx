@@ -3,16 +3,21 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/state/session";
+import { useSettings } from "@/lib/wallet/settings";
 import { deriveEvmAccount } from "@/lib/wallet/derive";
-import { getNetwork, defaultNetwork } from "@/lib/wallet/networks";
+import { getNetwork } from "@/lib/wallet/networks";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import SendForm from "@/components/SendForm";
 import type { Hex } from "viem";
 
 export default function SendPage() {
   const { mnemonic, isUnlocked } = useSession();
+  const { getActiveNetworkKeys } = useSettings();
   const router = useRouter();
-  const [networkKey, setNetworkKey] = useState(defaultNetwork);
+  const activeKeys = getActiveNetworkKeys().filter(
+    (k) => getNetwork(k).chainType === "evm"
+  );
+  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
   const [txHash, setTxHash] = useState<string | null>(null);
 
   useEffect(() => {

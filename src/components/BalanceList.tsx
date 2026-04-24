@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { type NetworkConfig } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
+import { getSolNativeBalance, getSplTokenBalance } from "@/lib/wallet/solana";
 import { fetchPrices } from "@/lib/wallet/prices";
+import { useSettings } from "@/lib/wallet/settings";
 import type { Address } from "viem";
 
 interface BalanceItem {
@@ -15,61 +17,72 @@ interface BalanceItem {
 
 interface BalanceListProps {
   network: NetworkConfig;
-  address: Address;
+  address: string;
 }
 
 export default function BalanceList({ network, address }: BalanceListProps) {
   const [balances, setBalances] = useState<BalanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { getVisibleTokens } = useSettings();
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [prices, nativeBal] = await Promise.all([
-        fetchPrices(),
-        getNativeBalance(network, address),
-      ]);
+      const visibleSymbols = getVisibleTokens(network.key);
+      const prices = await fetchPrices();
 
-      const tokenBals = await Promise.all(
-        network.tokens.map(async (token) => {
-          const bal = await getTokenBalance(
-            network,
-            token.address as Address,
-            address,
-            token.decimals
-          );
-          const price = prices[token.symbol] ?? 0;
-          const usd = parseFloat(bal.formatted) * price;
-          return {
-            symbol: token.symbol,
-            name: token.name,
-            balance: formatBalance(bal.formatted),
-            usdValue: formatUsd(usd),
-          };
-        })
-      );
+      const items: BalanceItem[] = [];
 
-      const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
-      const nativeUsd = parseFloat(nativeBal.formatted) * nativePrice;
-
-      setBalances([
-        {
+      if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
+        let nativeBal: { formatted: string };
+        if (network.chainType === "solana") {
+          nativeBal = await getSolNativeBalance(network, address);
+        } else {
+          nativeBal = await getNativeBalance(network, address as Address);
+        }
+        const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
+        const nativeUsd = parseFloat(nativeBal.formatted) * nativePrice;
+        items.push({
           symbol: network.nativeCurrency.symbol,
           name: network.nativeCurrency.name,
           balance: formatBalance(nativeBal.formatted),
           usdValue: formatUsd(nativeUsd),
-        },
-        ...tokenBals,
-      ]);
+        });
+      }
+
+      for (const token of network.tokens) {
+        if (!visibleSymbols.includes(token.symbol)) continue;
+        let bal: { formatted: string };
+        if (network.chainType === "solana") {
+          bal = await getSplTokenBalance(network, address, token.address);
+        } else {
+          bal = await getTokenBalance(
+            network,
+            token.address as Address,
+            address as Address,
+            token.decimals
+          );
+        }
+        const price = prices[token.symbol] ?? 0;
+        const usd = parseFloat(bal.formatted) * price;
+        items.push({
+          symbol: token.symbol,
+          name: token.name,
+          balance: formatBalance(bal.formatted),
+          usdValue: formatUsd(usd),
+        });
+      }
+
+      setBalances(items);
     } catch (e) {
       setError("Failed to load balances");
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [network, address]);
+  }, [network, address, getVisibleTokens]);
 
   useEffect(() => {
     refresh();
@@ -90,6 +103,9 @@ export default function BalanceList({ network, address }: BalanceListProps) {
         </button>
       </div>
       {error && <p className="text-m-red text-xs mb-2">{error}</p>}
+      {balances.length === 0 && !loading && !error && (
+        <p className="text-xs text-gray-400">No visible assets. Check Settings.</p>
+      )}
       <div className="space-y-2">
         {balances.map((b) => (
           <div

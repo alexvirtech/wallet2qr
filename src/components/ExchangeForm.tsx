@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { parseUnits, type Address, type Hex } from "viem";
-import { networks, networkKeys } from "@/lib/wallet/networks";
+import { allNetworks, allNetworkKeys } from "@/lib/wallet/networks";
+import { useSettings } from "@/lib/wallet/settings";
 import { initLifi } from "@/lib/lifi/client";
 import { fetchQuote } from "@/lib/lifi/quote";
 import type { LiFiStep, Route } from "@lifi/sdk";
@@ -14,13 +15,17 @@ interface ExchangeFormProps {
 }
 
 const NATIVE_ADDRESS = "0x0000000000000000000000000000000000000000";
+const SOL_NATIVE = "So11111111111111111111111111111111111111112";
 
 function getAllTokens(networkKey: string) {
-  const net = networks[networkKey];
+  const net = allNetworks[networkKey];
+  if (!net) return [];
+  const nativeAddr =
+    net.chainType === "solana" ? SOL_NATIVE : NATIVE_ADDRESS;
   return [
     {
       symbol: net.nativeCurrency.symbol,
-      address: NATIVE_ADDRESS,
+      address: nativeAddr,
       decimals: net.nativeCurrency.decimals,
       chainId: net.chainId,
     },
@@ -37,12 +42,16 @@ export default function ExchangeForm({
   address,
   currentNetwork,
 }: ExchangeFormProps) {
+  const { getActiveNetworkKeys } = useSettings();
+  const activeKeys = getActiveNetworkKeys();
+  const exchangeKeys = allNetworkKeys;
+
   const [fromChain, setFromChain] = useState(currentNetwork);
   const [toChain, setToChain] = useState(
     currentNetwork === "ethereum" ? "arbitrum" : "ethereum"
   );
-  const [fromToken, setFromToken] = useState(NATIVE_ADDRESS);
-  const [toToken, setToToken] = useState(NATIVE_ADDRESS);
+  const [fromToken, setFromToken] = useState("");
+  const [toToken, setToToken] = useState("");
   const [amount, setAmount] = useState("");
   const [quoteResult, setQuoteResult] = useState<{
     step: LiFiStep;
@@ -60,6 +69,18 @@ export default function ExchangeForm({
   const fromTokens = getAllTokens(fromChain);
   const toTokens = getAllTokens(toChain);
 
+  useEffect(() => {
+    if (fromTokens.length > 0 && !fromTokens.find((t) => t.address === fromToken)) {
+      setFromToken(fromTokens[0].address);
+    }
+  }, [fromChain, fromTokens, fromToken]);
+
+  useEffect(() => {
+    if (toTokens.length > 0 && !toTokens.find((t) => t.address === toToken)) {
+      setToToken(toTokens[0].address);
+    }
+  }, [toChain, toTokens, toToken]);
+
   const handleQuote = useCallback(async () => {
     setError(null);
     setQuoteResult(null);
@@ -72,8 +93,8 @@ export default function ExchangeForm({
       const fromTokenInfo = fromTokens.find((t) => t.address === fromToken)!;
       const fromAmount = parseUnits(amount, fromTokenInfo.decimals).toString();
       const result = await fetchQuote({
-        fromChain: networks[fromChain].chainId,
-        toChain: networks[toChain].chainId,
+        fromChain: allNetworks[fromChain].chainId,
+        toChain: allNetworks[toChain].chainId,
         fromToken,
         toToken,
         fromAmount,
@@ -122,14 +143,13 @@ export default function ExchangeForm({
             value={fromChain}
             onChange={(e) => {
               setFromChain(e.target.value);
-              setFromToken(NATIVE_ADDRESS);
               setQuoteResult(null);
             }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
-            {networkKeys.map((k) => (
+            {exchangeKeys.map((k) => (
               <option key={k} value={k}>
-                {networks[k].name}
+                {allNetworks[k].name}
               </option>
             ))}
           </select>
@@ -142,14 +162,13 @@ export default function ExchangeForm({
             value={toChain}
             onChange={(e) => {
               setToChain(e.target.value);
-              setToToken(NATIVE_ADDRESS);
               setQuoteResult(null);
             }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
-            {networkKeys.map((k) => (
+            {exchangeKeys.map((k) => (
               <option key={k} value={k}>
-                {networks[k].name}
+                {allNetworks[k].name}
               </option>
             ))}
           </select>

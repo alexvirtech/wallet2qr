@@ -11,29 +11,35 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface SessionState {
   mnemonic: string | null;
-  setMnemonic: (m: string | null) => void;
+  password: string | null;
+  setSession: (mnemonic: string, password: string) => void;
   lock: () => void;
   isUnlocked: boolean;
+  verifyPassword: (input: string) => boolean;
 }
 
 const SessionContext = createContext<SessionState>({
   mnemonic: null,
-  setMnemonic: () => {},
+  password: null,
+  setSession: () => {},
   lock: () => {},
   isUnlocked: false,
+  verifyPassword: () => false,
 });
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [mnemonic, setMnemonicRaw] = useState<string | null>(null);
+  const [password, setPasswordRaw] = useState<string | null>(null);
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lock = useCallback(() => {
     setMnemonicRaw(null);
+    setPasswordRaw(null);
     router.push("/qr-to-wallet");
   }, [router]);
 
@@ -44,17 +50,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [mnemonic, lock]);
 
-  const setMnemonic = useCallback(
-    (m: string | null) => {
+  const setSession = useCallback(
+    (m: string, p: string) => {
       setMnemonicRaw(m);
-      if (m) {
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
-      } else {
-        if (timerRef.current) clearTimeout(timerRef.current);
-      }
+      setPasswordRaw(p);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
     },
     [lock]
+  );
+
+  const verifyPassword = useCallback(
+    (input: string) => {
+      return password !== null && input === password;
+    },
+    [password]
   );
 
   useEffect(() => {
@@ -70,7 +80,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   return (
     <SessionContext.Provider
-      value={{ mnemonic, setMnemonic, lock, isUnlocked: !!mnemonic }}
+      value={{ mnemonic, password, setSession, lock, isUnlocked: !!mnemonic, verifyPassword }}
     >
       {children}
     </SessionContext.Provider>

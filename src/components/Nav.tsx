@@ -36,10 +36,20 @@ export default function Nav() {
               <Link
                 href="/wallet"
                 className={`hover:text-m-blue-light-4 transition-colors ${
-                  pathname.startsWith("/wallet") ? "text-m-blue-light-4 font-bold" : ""
+                  pathname === "/wallet" ? "text-m-blue-light-4 font-bold" : ""
                 }`}
               >
                 Wallet
+              </Link>
+              <Link
+                href="/wallet/settings"
+                className={`hover:text-m-blue-light-4 transition-colors ${
+                  pathname === "/wallet/settings"
+                    ? "text-m-blue-light-4 font-bold"
+                    : ""
+                }`}
+              >
+                Settings
               </Link>
               <button
                 onClick={lock}

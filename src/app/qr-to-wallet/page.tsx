@@ -12,7 +12,7 @@ export default function QrToWalletPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
-  const { setMnemonic } = useSession();
+  const { setSession } = useSession();
   const router = useRouter();
 
   const handleDecoded = useCallback((p: string) => {
@@ -44,9 +44,9 @@ export default function QrToWalletPage() {
       return;
     }
 
-    setMnemonic(decrypted);
+    setSession(decrypted, password);
     router.push("/wallet");
-  }, [payload, password, setMnemonic, router]);
+  }, [payload, password, setSession, router]);
 
   const handleReset = useCallback(() => {
     setPayload(null);

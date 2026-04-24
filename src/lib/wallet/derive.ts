@@ -3,8 +3,9 @@ import { wordlist } from "@scure/bip39/wordlists/english";
 import { HDKey } from "@scure/bip32";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Hex } from "viem";
+import { deriveSolanaAccount } from "./solana";
+import type { ChainType } from "./networks";
 
-// BIP-44 path for EVM: m/44'/60'/0'/0/0
 const EVM_PATH = "m/44'/60'/0'/0/0";
 
 export function validateBip39Mnemonic(phrase: string): {
@@ -50,4 +51,13 @@ export function deriveEvmAccount(mnemonic: string) {
     privateKey: privateKeyHex,
     account,
   };
+}
+
+export function deriveAccount(mnemonic: string, chainType: ChainType) {
+  if (chainType === "solana") {
+    const sol = deriveSolanaAccount(mnemonic);
+    return { address: sol.address, privateKey: sol.privateKey };
+  }
+  const evm = deriveEvmAccount(mnemonic);
+  return { address: evm.address as string, privateKey: evm.privateKey as string };
 }

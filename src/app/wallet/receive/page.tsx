@@ -3,15 +3,18 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/state/session";
-import { deriveEvmAccount } from "@/lib/wallet/derive";
-import { getNetwork, defaultNetwork } from "@/lib/wallet/networks";
+import { useSettings } from "@/lib/wallet/settings";
+import { deriveAccount } from "@/lib/wallet/derive";
+import { getNetwork } from "@/lib/wallet/networks";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import QRCode from "qrcode";
 
 export default function ReceivePage() {
   const { mnemonic, isUnlocked } = useSession();
+  const { getActiveNetworkKeys } = useSettings();
   const router = useRouter();
-  const [networkKey, setNetworkKey] = useState(defaultNetwork);
+  const activeKeys = getActiveNetworkKeys();
+  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
   const [copied, setCopied] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -19,16 +22,16 @@ export default function ReceivePage() {
     if (!isUnlocked) router.push("/qr-to-wallet");
   }, [isUnlocked, router]);
 
+  const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveEvmAccount(mnemonic);
+      return deriveAccount(mnemonic, network.chainType);
     } catch {
       return null;
     }
-  }, [mnemonic]);
-
-  const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+  }, [mnemonic, network.chainType]);
 
   useEffect(() => {
     if (canvasRef.current && account) {
