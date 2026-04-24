@@ -40,6 +40,7 @@ function getAllTokens(networkKey: string) {
 
 export default function ExchangeForm({
   address,
+  privateKey,
   currentNetwork,
 }: ExchangeFormProps) {
   const { getActiveNetworkKeys } = useSettings();
@@ -115,12 +116,19 @@ export default function ExchangeForm({
     setError(null);
     try {
       const { executeLifiRoute } = await import("@/lib/lifi/execute");
-      await executeLifiRoute(quoteResult.route, (updated) => {
-        const step = updated.steps?.[0];
-        if (step?.execution?.status) {
-          setTxStatus(`Status: ${step.execution.status}`);
+      const fromNet = allNetworks[fromChain];
+      await executeLifiRoute(
+        quoteResult.route,
+        privateKey,
+        fromNet.chainType,
+        fromNet.chainId,
+        (updated) => {
+          const step = updated.steps?.[0];
+          if (step?.execution?.status) {
+            setTxStatus(`Status: ${step.execution.status}`);
+          }
         }
-      });
+      );
       setTxStatus("Swap completed!");
       setQuoteResult(null);
       setAmount("");
@@ -130,7 +138,7 @@ export default function ExchangeForm({
     } finally {
       setExecuting(false);
     }
-  }, [quoteResult]);
+  }, [quoteResult, privateKey, fromChain]);
 
   return (
     <div className="space-y-4">
