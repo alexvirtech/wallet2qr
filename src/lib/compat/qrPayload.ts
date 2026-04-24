@@ -4,7 +4,7 @@ import { encrypt, decrypt } from "./crypto";
 export function buildQrUrl(plaintext: string, password: string): string {
   const ds = encrypt(plaintext, password);
   const host =
-    typeof window !== "undefined" ? window.location.origin : "https://wallet2qr.com";
+    typeof window !== "undefined" ? window.location.origin : "https://www.wallet2qr.com";
   return `${host}/?ds=${ds}`;
 }
 
