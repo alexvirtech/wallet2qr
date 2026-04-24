@@ -1,15 +1,29 @@
-import { createPublicClient, http, erc20Abi, formatUnits, type Address } from "viem";
+import { createPublicClient, http, fallback, erc20Abi, formatUnits, type Address, type Chain } from "viem";
+import { arbitrum, mainnet, avalanche } from "viem/chains";
 import { type NetworkConfig } from "./networks";
 
+const chainMap: Record<number, Chain> = {
+  [arbitrum.id]: arbitrum,
+  [mainnet.id]: mainnet,
+  [avalanche.id]: avalanche,
+};
+
 export function getPublicClient(network: NetworkConfig) {
+  const chain = chainMap[network.chainId];
+  const transports = [http(network.rpcUrl)];
+
+  if (chain) {
+    for (const url of chain.rpcUrls.default.http) {
+      if (url !== network.rpcUrl) {
+        transports.push(http(url));
+      }
+    }
+  }
+
   return createPublicClient({
-    transport: http(network.rpcUrl),
-    chain: {
-      id: network.chainId,
-      name: network.name,
-      nativeCurrency: network.nativeCurrency,
-      rpcUrls: { default: { http: [network.rpcUrl] } },
-    },
+    chain,
+    transport: fallback(transports),
+    batch: { multicall: true },
   });
 }
 

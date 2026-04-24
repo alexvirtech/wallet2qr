@@ -2,16 +2,25 @@ import {
   createWalletClient,
   createPublicClient,
   http,
+  fallback,
   parseUnits,
   erc20Abi,
   type Address,
   type Hex,
+  type Chain,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { arbitrum, mainnet, avalanche } from "viem/chains";
 import type { NetworkConfig, TokenConfig } from "./networks";
 
-function buildChain(network: NetworkConfig) {
-  return {
+const chainMap: Record<number, Chain> = {
+  [arbitrum.id]: arbitrum,
+  [mainnet.id]: mainnet,
+  [avalanche.id]: avalanche,
+};
+
+function getChain(network: NetworkConfig): Chain {
+  return chainMap[network.chainId] ?? {
     id: network.chainId,
     name: network.name,
     nativeCurrency: network.nativeCurrency,
@@ -25,9 +34,10 @@ export async function estimateGas(
   to: Address,
   value: bigint
 ) {
+  const chain = getChain(network);
   const client = createPublicClient({
-    transport: http(network.rpcUrl),
-    chain: buildChain(network),
+    chain,
+    transport: fallback([http(network.rpcUrl), http()]),
   });
   const gasEstimate = await client.estimateGas({ account: from, to, value });
   const gasPrice = await client.getGasPrice();
@@ -40,12 +50,12 @@ export async function sendNative(
   to: Address,
   amount: string
 ): Promise<Hex> {
-  const chain = buildChain(network);
+  const chain = getChain(network);
   const account = privateKeyToAccount(privateKey);
   const client = createWalletClient({
     account,
-    transport: http(network.rpcUrl),
     chain,
+    transport: http(network.rpcUrl),
   });
   const value = parseUnits(amount, network.nativeCurrency.decimals);
   return client.sendTransaction({ to, value, chain });
@@ -58,12 +68,12 @@ export async function sendToken(
   to: Address,
   amount: string
 ): Promise<Hex> {
-  const chain = buildChain(network);
+  const chain = getChain(network);
   const account = privateKeyToAccount(privateKey);
   const client = createWalletClient({
     account,
-    transport: http(network.rpcUrl),
     chain,
+    transport: http(network.rpcUrl),
   });
   const value = parseUnits(amount, token.decimals);
   return client.writeContract({
