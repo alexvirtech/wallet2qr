@@ -7,6 +7,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, arbitrum, avalanche } from "viem/chains";
+import { allNetworks } from "@/lib/wallet/networks";
 
 const INTEGRATOR = process.env.NEXT_PUBLIC_LIFI_INTEGRATOR || "wallet2qr";
 
@@ -15,6 +16,13 @@ const chainMap: Record<number, Chain> = {
   42161: arbitrum,
   43114: avalanche,
 };
+
+function getRpcUrl(chainId: number): string | undefined {
+  for (const net of Object.values(allNetworks)) {
+    if (net.chainId === chainId && net.chainType === "evm") return net.rpcUrl;
+  }
+  return undefined;
+}
 
 export function initLifi() {
   return createConfig({
@@ -26,6 +34,7 @@ export function initLifi() {
 export function initLifiWithSigner(privateKey: Hex, chainId: number) {
   const chain = chainMap[chainId] ?? mainnet;
   const account = privateKeyToAccount(privateKey);
+  const rpcUrl = getRpcUrl(chainId);
 
   return createConfig({
     integrator: INTEGRATOR,
@@ -35,7 +44,7 @@ export function initLifiWithSigner(privateKey: Hex, chainId: number) {
           createWalletClient({
             account,
             chain,
-            transport: http(),
+            transport: http(rpcUrl),
           }),
         switchChain: async (reqChainId: number) => {
           const targetChain = chainMap[reqChainId];
@@ -43,7 +52,7 @@ export function initLifiWithSigner(privateKey: Hex, chainId: number) {
           return createWalletClient({
             account,
             chain: targetChain,
-            transport: http(),
+            transport: http(getRpcUrl(reqChainId)),
           });
         },
       }),
