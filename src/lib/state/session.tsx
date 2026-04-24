@@ -12,6 +12,37 @@ import {
 import { useRouter } from "next/navigation";
 
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const STORAGE_KEY = "w2q_session";
+
+interface StoredSession {
+  mnemonic: string;
+  password: string;
+}
+
+function saveToStorage(mnemonic: string, password: string) {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ mnemonic, password } satisfies StoredSession)
+    );
+  } catch {}
+}
+
+function loadFromStorage(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.mnemonic && typeof parsed.password === "string") return parsed;
+  } catch {}
+  return null;
+}
+
+function clearStorage() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+}
 
 interface SessionState {
   mnemonic: string | null;
@@ -34,12 +65,23 @@ const SessionContext = createContext<SessionState>({
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [mnemonic, setMnemonicRaw] = useState<string | null>(null);
   const [password, setPasswordRaw] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const stored = loadFromStorage();
+    if (stored) {
+      setMnemonicRaw(stored.mnemonic);
+      setPasswordRaw(stored.password);
+    }
+    setHydrated(true);
+  }, []);
 
   const lock = useCallback(() => {
     setMnemonicRaw(null);
     setPasswordRaw(null);
+    clearStorage();
     router.push("/qr-to-wallet");
   }, [router]);
 
@@ -54,6 +96,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     (m: string, p: string) => {
       setMnemonicRaw(m);
       setPasswordRaw(p);
+      saveToStorage(m, p);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
     },
@@ -78,9 +121,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [mnemonic, resetIdleTimer]);
 
+  if (!hydrated) return null;
+
   return (
     <SessionContext.Provider
-      value={{ mnemonic, password, setSession, lock, isUnlocked: !!mnemonic, verifyPassword }}
+      value={{
+        mnemonic,
+        password,
+        setSession,
+        lock,
+        isUnlocked: !!mnemonic,
+        verifyPassword,
+      }}
     >
       {children}
     </SessionContext.Provider>
