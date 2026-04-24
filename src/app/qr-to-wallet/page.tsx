@@ -1,0 +1,112 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import QrScanner from "@/components/QrScanner";
+import { decryptPayload } from "@/lib/compat/qrPayload";
+import { validateBip39Mnemonic } from "@/lib/wallet/derive";
+import { useSession } from "@/lib/state/session";
+
+export default function QrToWalletPage() {
+  const [payload, setPayload] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [decrypting, setDecrypting] = useState(false);
+  const { setMnemonic } = useSession();
+  const router = useRouter();
+
+  const handleDecoded = useCallback((p: string) => {
+    setPayload(p);
+    setError(null);
+  }, []);
+
+  const handleDecrypt = useCallback(() => {
+    if (!payload || !password) {
+      setError("Upload a QR code and enter a password.");
+      return;
+    }
+    setDecrypting(true);
+    setError(null);
+
+    const decrypted = decryptPayload(payload, password);
+    if (!decrypted) {
+      setError("Wrong passphrase or corrupted QR code.");
+      setDecrypting(false);
+      return;
+    }
+
+    const validation = validateBip39Mnemonic(decrypted);
+    if (!validation.valid) {
+      setError(
+        `Decrypted text is not a valid BIP-39 mnemonic: ${validation.error}`
+      );
+      setDecrypting(false);
+      return;
+    }
+
+    setMnemonic(decrypted);
+    router.push("/wallet");
+  }, [payload, password, setMnemonic, router]);
+
+  const handleReset = useCallback(() => {
+    setPayload(null);
+    setPassword("");
+    setError(null);
+  }, []);
+
+  return (
+    <div className="w-full max-w-2xl mx-auto px-6 py-6">
+      <h1 className="text-3xl font-bold mb-2">QR → Wallet</h1>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+        Scan or upload an encrypted QR code to unlock your wallet.
+      </p>
+
+      {!payload ? (
+        <QrScanner
+          onDecoded={handleDecoded}
+          onError={(msg) => setError(msg)}
+        />
+      ) : (
+        <div className="space-y-4">
+          <div className="bg-m-green/10 border border-m-green/30 rounded-lg p-3 text-sm text-m-green font-bold">
+            QR code detected! Enter your password to decrypt.
+          </div>
+
+          <div>
+            <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password to decrypt"
+              className="mt-1 px-2 py-1 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+              onKeyDown={(e) => e.key === "Enter" && handleDecrypt()}
+            />
+          </div>
+
+          {error && <p className="text-m-red text-sm">{error}</p>}
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleDecrypt}
+              disabled={decrypting}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
+            >
+              {decrypting ? "Decrypting..." : "Decrypt & Open Wallet"}
+            </button>
+            <button
+              onClick={handleReset}
+              className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-1.5 px-4 rounded-md text-sm"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!payload && error && <p className="text-m-red text-sm mt-4">{error}</p>}
+    </div>
+  );
+}

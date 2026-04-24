@@ -1,0 +1,39 @@
+{
+  "name": "wallet2qr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Your crypto wallet, sealed in a QR code.",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@lifi/sdk": "^3.4.1",
+    "@scure/bip32": "^1.6.2",
+    "@scure/bip39": "^1.5.4",
+    "crypto-js": "^4.2.0",
+    "jsqr": "^1.4.0",
+    "next": "^15.3.1",
+    "qr-scanner": "^1.4.2",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "viem": "^2.23.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.4",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^22.14.1",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}
