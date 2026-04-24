@@ -34,11 +34,12 @@ export default function Nav() {
 
         {/* Desktop nav */}
         <nav className="hidden sm:flex items-center gap-4 text-sm">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} className={linkClass(l.href)}>
-              {l.label}
-            </Link>
-          ))}
+          {!isUnlocked &&
+            links.map((l) => (
+              <Link key={l.href} href={l.href} className={linkClass(l.href)}>
+                {l.label}
+              </Link>
+            ))}
           {isUnlocked && (
             <>
               <Link href="/wallet" className={exactClass("/wallet")}>
@@ -87,16 +88,17 @@ export default function Nav() {
       {/* Mobile menu */}
       {open && (
         <nav className="sm:hidden border-t border-white/10 px-4 pb-4 text-sm space-y-1">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={() => setOpen(false)}
-              className={linkClass(l.href)}
-            >
-              {l.label}
-            </Link>
-          ))}
+          {!isUnlocked &&
+            links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setOpen(false)}
+                className={linkClass(l.href)}
+              >
+                {l.label}
+              </Link>
+            ))}
           {isUnlocked && (
             <>
               <Link
