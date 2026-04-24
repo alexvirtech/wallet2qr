@@ -17,11 +17,11 @@ export interface TokenConfig {
 }
 
 const ARB_RPC =
-  process.env.NEXT_PUBLIC_ARB_RPC_URL || "https://arbitrum.publicnode.com";
+  process.env.NEXT_PUBLIC_ARB_RPC_URL || "https://arbitrum-one-rpc.publicnode.com";
 const ETH_RPC =
-  process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://ethereum.publicnode.com";
+  process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://ethereum-rpc.publicnode.com";
 const AVAX_RPC =
-  process.env.NEXT_PUBLIC_AVAX_RPC_URL || "https://avalanche-c-chain.publicnode.com";
+  process.env.NEXT_PUBLIC_AVAX_RPC_URL || "https://avalanche-c-chain-rpc.publicnode.com";
 
 export const networks: Record<string, NetworkConfig> = {
   arbitrum: {
