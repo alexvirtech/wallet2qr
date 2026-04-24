@@ -1,7 +1,11 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { decodeQrFromImage, extractPayloadFromQrData } from "@/lib/compat/qrDecoder";
+import {
+  decodeQrFromImage,
+  decodeQrFromImageData,
+  extractPayloadFromQrData,
+} from "@/lib/compat/qrDecoder";
 
 interface QrScannerProps {
   onDecoded: (payload: string) => void;
@@ -11,8 +15,10 @@ interface QrScannerProps {
 export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number>(0);
   const [scanning, setScanning] = useState(false);
-  const scannerRef = useRef<{ destroy: () => void } | null>(null);
 
   const handleFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,8 +29,7 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
       img.onload = () => {
         const qrData = decodeQrFromImage(img);
         if (qrData) {
-          const payload = extractPayloadFromQrData(qrData);
-          onDecoded(payload);
+          onDecoded(extractPayloadFromQrData(qrData));
         } else {
           onError("No QR code found in the image.");
         }
@@ -56,39 +61,59 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
     [onDecoded, onError]
   );
 
-  const startCamera = useCallback(async () => {
-    if (!videoRef.current) return;
-    setScanning(true);
+  const stopCamera = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setScanning(false);
+  }, []);
 
+  const startCamera = useCallback(async () => {
     try {
-      const QrScanner = (await import("qr-scanner")).default;
-      const scanner = new QrScanner(
-        videoRef.current,
-        (result) => {
-          const payload = extractPayloadFromQrData(result.data);
-          onDecoded(payload);
-          scanner.destroy();
-          setScanning(false);
-        },
-        { highlightScanRegion: true }
-      );
-      scannerRef.current = scanner;
-      await scanner.start();
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      const video = videoRef.current!;
+      video.srcObject = stream;
+      await video.play();
+      setScanning(true);
+
+      const canvas = canvasRef.current!;
+      const ctx = canvas.getContext("2d")!;
+
+      const scan = () => {
+        if (!streamRef.current) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const qrData = decodeQrFromImageData(
+            imageData.data,
+            canvas.width,
+            canvas.height
+          );
+          if (qrData) {
+            const payload = extractPayloadFromQrData(qrData);
+            stopCamera();
+            onDecoded(payload);
+            return;
+          }
+        }
+        rafRef.current = requestAnimationFrame(scan);
+      };
+      rafRef.current = requestAnimationFrame(scan);
     } catch {
       onError("Camera access denied or unavailable.");
       setScanning(false);
     }
-  }, [onDecoded, onError]);
-
-  const stopCamera = useCallback(() => {
-    scannerRef.current?.destroy();
-    scannerRef.current = null;
-    setScanning(false);
-  }, []);
+  }, [onDecoded, onError, stopCamera]);
 
   useEffect(() => {
     return () => {
-      scannerRef.current?.destroy();
+      cancelAnimationFrame(rafRef.current);
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
@@ -136,8 +161,11 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
 
       <video
         ref={videoRef}
+        playsInline
+        muted
         className={`w-full max-w-md mx-auto rounded-lg ${scanning ? "" : "hidden"}`}
       />
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
