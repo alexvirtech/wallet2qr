@@ -21,7 +21,7 @@ export default function WalletPage() {
       const stored = localStorage.getItem("w2q_network");
       if (stored && activeKeys.includes(stored)) return stored;
     }
-    return activeKeys[0] ?? "ethereum";
+    return activeKeys[0] ?? "arbitrum";
   });
   const [copied, setCopied] = useState(false);
   const addressQrRef = useRef<HTMLCanvasElement>(null);

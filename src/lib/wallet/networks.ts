@@ -31,6 +31,33 @@ const SOL_RPC =
   process.env.NEXT_PUBLIC_SOL_RPC_URL || "https://api.mainnet-beta.solana.com";
 
 export const allNetworks: Record<string, NetworkConfig> = {
+  arbitrum: {
+    key: "arbitrum",
+    name: "Arbitrum One",
+    chainId: 42161,
+    chainType: "evm",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrl: ARB_RPC,
+    blockExplorer: "https://arbiscan.io",
+    derivationPath: "m/44'/60'/0'/0/0",
+    isDefault: true,
+    tokens: [
+      {
+        symbol: "ARB",
+        name: "Arbitrum",
+        address: "0x912CE59144191C1204E64559FE8253a0e49E6548",
+        decimals: 18,
+        coingeckoId: "arbitrum",
+      },
+      {
+        symbol: "USDT",
+        name: "Tether USD",
+        address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+        decimals: 6,
+        coingeckoId: "tether",
+      },
+    ],
+  },
   ethereum: {
     key: "ethereum",
     name: "Ethereum Mainnet",
@@ -51,33 +78,6 @@ export const allNetworks: Record<string, NetworkConfig> = {
       },
     ],
   },
-  arbitrum: {
-    key: "arbitrum",
-    name: "Arbitrum One",
-    chainId: 42161,
-    chainType: "evm",
-    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrl: ARB_RPC,
-    blockExplorer: "https://arbiscan.io",
-    derivationPath: "m/44'/60'/0'/0/0",
-    isDefault: false,
-    tokens: [
-      {
-        symbol: "ARB",
-        name: "Arbitrum",
-        address: "0x912CE59144191C1204E64559FE8253a0e49E6548",
-        decimals: 18,
-        coingeckoId: "arbitrum",
-      },
-      {
-        symbol: "USDT",
-        name: "Tether USD",
-        address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
-        decimals: 6,
-        coingeckoId: "tether",
-      },
-    ],
-  },
   avalanche: {
     key: "avalanche",
     name: "Avalanche C-Chain",
@@ -87,7 +87,7 @@ export const allNetworks: Record<string, NetworkConfig> = {
     rpcUrl: AVAX_RPC,
     blockExplorer: "https://snowtrace.io",
     derivationPath: "m/44'/60'/0'/0/0",
-    isDefault: true,
+    isDefault: false,
     tokens: [
       {
         symbol: "USDT",
@@ -121,7 +121,7 @@ export const allNetworks: Record<string, NetworkConfig> = {
 };
 
 export function getNetwork(key: string): NetworkConfig {
-  return allNetworks[key] ?? allNetworks.ethereum;
+  return allNetworks[key] ?? allNetworks.arbitrum;
 }
 
 export const allNetworkKeys = Object.keys(allNetworks);

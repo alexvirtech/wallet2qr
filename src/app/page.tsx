@@ -12,20 +12,23 @@ function DeepLinkHandler() {
   const router = useRouter();
   const { setSession } = useSession();
   const ds = searchParams.get("ds");
+  const pw = searchParams.get("pw");
 
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(pw ?? "");
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
+  const [autoAttempted, setAutoAttempted] = useState(false);
 
-  const handleDecrypt = useCallback(() => {
-    if (!ds || !password) {
+  const handleDecrypt = useCallback((pwd?: string) => {
+    const pass = pwd ?? password;
+    if (!ds || !pass) {
       setError("Enter your password to decrypt.");
       return;
     }
     setDecrypting(true);
     setError(null);
 
-    const decrypted = decryptPayload(ds, password);
+    const decrypted = decryptPayload(ds, pass);
     if (!decrypted) {
       setError("Wrong password or corrupted data.");
       setDecrypting(false);
@@ -41,9 +44,16 @@ function DeepLinkHandler() {
       return;
     }
 
-    setSession(decrypted, password);
+    setSession(decrypted, pass);
     router.push("/wallet");
   }, [ds, password, setSession, router]);
+
+  useEffect(() => {
+    if (ds && pw && !autoAttempted) {
+      setAutoAttempted(true);
+      handleDecrypt(pw);
+    }
+  }, [ds, pw, autoAttempted, handleDecrypt]);
 
   if (!ds) return null;
 
@@ -66,7 +76,7 @@ function DeepLinkHandler() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password to decrypt"
             className="mt-1 px-3 py-2 border border-gray-300 rounded-lg w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-            onKeyDown={(e) => e.key === "Enter" && handleDecrypt()}
+            onKeyDown={(e) => { if (e.key === "Enter") handleDecrypt(); }}
             autoFocus
           />
         </div>
@@ -74,7 +84,7 @@ function DeepLinkHandler() {
         {error && <p className="text-m-red text-sm">{error}</p>}
 
         <button
-          onClick={handleDecrypt}
+          onClick={() => handleDecrypt()}
           disabled={decrypting}
           className="w-full bg-m-green hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg text-sm disabled:opacity-50"
         >
