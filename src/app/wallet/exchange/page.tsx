@@ -51,7 +51,6 @@ export default function ExchangePage() {
 
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
         Swap tokens across Ethereum, Arbitrum, Avalanche, and Solana via LI.FI.
-        A 0.5% integrator fee is included in quotes.
       </p>
 
       <ExchangeForm

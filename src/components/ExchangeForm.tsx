@@ -246,8 +246,7 @@ export default function ExchangeForm({
             {quoteResult.step.action?.toToken?.symbol}
           </p>
           <p>
-            <span className="font-bold">Fee (incl. 0.5% integrator):</span>{" "}
-            included in quote
+            <span className="font-bold">Fees:</span> included in quote
           </p>
         </div>
       )}

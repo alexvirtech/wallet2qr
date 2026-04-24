@@ -5,9 +5,7 @@ import {
   type LiFiStep,
   type Route,
 } from "@lifi/sdk";
-import { LIFI_FEE, INTEGRATOR } from "./client";
-
-const FEE_RECEIVER = process.env.NEXT_PUBLIC_LIFI_FEE_RECEIVER || "";
+import { INTEGRATOR } from "./client";
 
 export async function fetchQuote(params: {
   fromChain: number;
@@ -25,12 +23,7 @@ export async function fetchQuote(params: {
     fromAmount: params.fromAmount,
     fromAddress: params.fromAddress,
     integrator: INTEGRATOR,
-    fee: LIFI_FEE,
   };
-
-  if (FEE_RECEIVER) {
-    request.referrer = FEE_RECEIVER;
-  }
 
   const step = await getQuote(request);
   const route = convertQuoteToRoute(step);
