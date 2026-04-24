@@ -70,13 +70,26 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
 
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" },
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
       streamRef.current = stream;
       const video = videoRef.current!;
       video.srcObject = stream;
-      await video.play();
+      video.setAttribute("autoplay", "");
+      video.setAttribute("playsinline", "");
+
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play().then(() => resolve()).catch(() => resolve());
+        };
+      });
+
       setScanning(true);
 
       const canvas = canvasRef.current!;
@@ -84,7 +97,7 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
 
       const scan = () => {
         if (!streamRef.current) return;
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0);
@@ -161,9 +174,11 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
 
       <video
         ref={videoRef}
+        autoPlay
         playsInline
         muted
-        className={`w-full max-w-md mx-auto rounded-lg ${scanning ? "" : "hidden"}`}
+        style={{ width: "100%", maxWidth: 480 }}
+        className={`mx-auto rounded-lg ${scanning ? "block" : "hidden"}`}
       />
       <canvas ref={canvasRef} className="hidden" />
     </div>
