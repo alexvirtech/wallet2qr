@@ -83,6 +83,7 @@ export default function QrToWalletPage() {
               placeholder="Enter password to decrypt"
               className="mt-1 px-2 py-1 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
               onKeyDown={(e) => e.key === "Enter" && handleDecrypt()}
+              autoFocus
             />
           </div>
 

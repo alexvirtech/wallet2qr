@@ -16,9 +16,20 @@ export default function WalletPage() {
   const router = useRouter();
 
   const activeKeys = getActiveNetworkKeys();
-  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
+  const [networkKey, setNetworkKey] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("w2q_network");
+      if (stored && activeKeys.includes(stored)) return stored;
+    }
+    return activeKeys[0] ?? "ethereum";
+  });
   const [copied, setCopied] = useState(false);
   const addressQrRef = useRef<HTMLCanvasElement>(null);
+
+  const handleNetworkChange = useCallback((key: string) => {
+    setNetworkKey(key);
+    try { localStorage.setItem("w2q_network", key); } catch {}
+  }, []);
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -26,7 +37,9 @@ export default function WalletPage() {
 
   useEffect(() => {
     if (!activeKeys.includes(networkKey) && activeKeys.length > 0) {
-      setNetworkKey(activeKeys[0]);
+      const fallback = activeKeys[0];
+      setNetworkKey(fallback);
+      try { localStorage.setItem("w2q_network", fallback); } catch {}
     }
   }, [activeKeys, networkKey]);
 
@@ -80,7 +93,7 @@ export default function WalletPage() {
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Wallet</h1>
-        <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+        <NetworkSwitcher current={networkKey} onChange={handleNetworkChange} />
       </div>
 
       <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4 mb-6">
