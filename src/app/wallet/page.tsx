@@ -61,7 +61,7 @@ export default function WalletPage() {
 
   if (activeKeys.length === 0) {
     return (
-      <div className="w-full max-w-2xl mx-auto px-6 py-6 text-center">
+      <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 text-center">
         <h1 className="text-2xl font-bold mb-4">Wallet</h1>
         <p className="text-gray-500 mb-4">
           No networks added. Go to Settings to add a network.
@@ -77,18 +77,18 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-6 py-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Wallet</h1>
         <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
       </div>
 
       <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-4">
-          <canvas ref={addressQrRef} className="rounded" />
-          <div className="flex-1 min-w-0">
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <canvas ref={addressQrRef} className="rounded flex-shrink-0" />
+          <div className="flex-1 min-w-0 text-center sm:text-left">
             <p className="text-xs text-gray-400 mb-1">Your Address ({network.name})</p>
-            <p className="font-mono text-sm break-all">{account.address}</p>
+            <p className="font-mono text-xs sm:text-sm break-all">{account.address}</p>
             <button
               onClick={copyAddress}
               className="mt-2 text-xs text-blue-500 hover:text-blue-700"

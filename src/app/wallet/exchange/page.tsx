@@ -35,8 +35,8 @@ export default function ExchangePage() {
   if (!isUnlocked || !account) return null;
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-6 py-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.push("/wallet")}

@@ -96,7 +96,7 @@ export default function SendForm({
         />
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1">
           <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
             Amount

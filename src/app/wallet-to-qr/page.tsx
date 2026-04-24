@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import MnemonicInput from "@/components/MnemonicInput";
 import QrCanvas from "@/components/QrCanvas";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { buildQrUrl, decryptPayload } from "@/lib/compat/qrPayload";
 import { extractPayloadFromQrData } from "@/lib/compat/qrDecoder";
+import { useSession } from "@/lib/state/session";
 
 export default function WalletToQrPage() {
   const [mnemonic, setMnemonic] = useState("");
@@ -14,6 +16,8 @@ export default function WalletToQrPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const { setSession } = useSession();
+  const router = useRouter();
 
   const handleEncrypt = useCallback(
     (e: React.FormEvent) => {
@@ -64,8 +68,8 @@ export default function WalletToQrPage() {
   }, []);
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-6 py-6">
-      <h1 className="text-3xl font-bold mb-2">Wallet → QR Code</h1>
+    <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-2">Wallet → QR Code</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Encrypt your BIP-39 mnemonic phrase into a QR code for secure storage.
       </p>
@@ -127,7 +131,7 @@ export default function WalletToQrPage() {
           </p>
         )}
 
-        <div className="flex justify-center gap-2 pt-2">
+        <div className="flex flex-wrap justify-center gap-2 pt-2">
           {!qrData ? (
             <button
               type="submit"
@@ -137,6 +141,16 @@ export default function WalletToQrPage() {
             </button>
           ) : (
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  setSession(mnemonic.trim(), password);
+                  router.push("/wallet");
+                }}
+                className="bg-m-green hover:bg-green-600 text-white font-bold py-1.5 px-4 rounded-md text-sm"
+              >
+                Open Wallet
+              </button>
               <button
                 type="button"
                 onClick={handleTestDecode}

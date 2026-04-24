@@ -55,8 +55,8 @@ export default function QrToWalletPage() {
   }, []);
 
   return (
-    <div className="w-full max-w-2xl mx-auto px-6 py-6">
-      <h1 className="text-3xl font-bold mb-2">QR → Wallet</h1>
+    <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-2">QR → Wallet</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Scan or upload an encrypted QR code to unlock your wallet.
       </p>
