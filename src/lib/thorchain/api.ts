@@ -1,4 +1,4 @@
-const THORNODE_BASE = "https://thornode.ninerealms.com/thorchain";
+const QUOTE_PROXY = "/api/thor-quote";
 
 export const THORCHAIN_AFFILIATE = process.env.NEXT_PUBLIC_THOR_AFFILIATE || "";
 export const THORCHAIN_AFFILIATE_BPS = process.env.NEXT_PUBLIC_THOR_AFFILIATE_BPS || "30";
@@ -74,23 +74,23 @@ export interface ThorQuoteResponse {
 }
 
 export async function fetchThorQuote(params: ThorQuoteParams): Promise<ThorQuoteResponse> {
-  const url = new URL(`${THORNODE_BASE}/quote/swap`);
-  url.searchParams.set("from_asset", params.fromAsset);
-  url.searchParams.set("to_asset", params.toAsset);
-  url.searchParams.set("amount", params.amount);
-  url.searchParams.set("destination", params.destination);
+  const qs = new URLSearchParams();
+  qs.set("from_asset", params.fromAsset);
+  qs.set("to_asset", params.toAsset);
+  qs.set("amount", params.amount);
+  qs.set("destination", params.destination);
 
   if (params.affiliate) {
-    url.searchParams.set("affiliate", params.affiliate);
+    qs.set("affiliate", params.affiliate);
   }
   if (params.affiliateBps) {
-    url.searchParams.set("affiliate_bps", params.affiliateBps);
+    qs.set("affiliate_bps", params.affiliateBps);
   }
   if (params.streamingInterval) {
-    url.searchParams.set("streaming_interval", String(params.streamingInterval));
+    qs.set("streaming_interval", String(params.streamingInterval));
   }
 
-  const res = await fetch(url.toString());
+  const res = await fetch(`${QUOTE_PROXY}?${qs.toString()}`);
   if (!res.ok) {
     const text = await res.text();
     let msg = `THORChain API error (${res.status})`;
