@@ -24,7 +24,7 @@ export async function GET() {
   }
 
   try {
-    const url = `https://gateway.liquify.com/chain/thorchain_midgard/v2/actions?address=${affiliate}&type=swap&limit=100`;
+    const url = `https://gateway.liquify.com/chain/thorchain_midgard/v2/actions?address=${affiliate}&type=swap&limit=50`;
     const res = await fetch(url);
     if (!res.ok) {
       return NextResponse.json({ swaps: [], affiliate, error: `Midgard ${res.status}` });
