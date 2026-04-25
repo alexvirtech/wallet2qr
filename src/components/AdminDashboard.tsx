@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ThorSwapRow, LifiSwapRow } from "@/app/admin/page";
 
 interface Props {
-  thorSwaps: ThorSwapRow[];
   lifiSwaps: LifiSwapRow[];
-  thorAffiliate?: string;
 }
 
 function formatDate(ts: number) {
@@ -25,8 +23,22 @@ function assetLabel(asset: string) {
 
 type Tab = "thorchain" | "lifi";
 
-export default function AdminDashboard({ thorSwaps, lifiSwaps, thorAffiliate }: Props) {
+export default function AdminDashboard({ lifiSwaps }: Props) {
   const [tab, setTab] = useState<Tab>("thorchain");
+  const [thorSwaps, setThorSwaps] = useState<ThorSwapRow[]>([]);
+  const [thorAffiliate, setThorAffiliate] = useState<string>("");
+  const [thorLoading, setThorLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/thor-swaps")
+      .then((r) => r.json())
+      .then((data) => {
+        setThorSwaps(data.swaps ?? []);
+        setThorAffiliate(data.affiliate ?? "");
+      })
+      .catch(() => setThorSwaps([]))
+      .finally(() => setThorLoading(false));
+  }, []);
 
   const thorCount = thorSwaps.length;
   const thorFeeTotal = thorSwaps.reduce((sum, s) => sum + s.affiliateFeeBps, 0);
@@ -72,7 +84,9 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps, thorAffiliate }: 
 
       {tab === "thorchain" && (
         <div className="overflow-x-auto">
-          {thorCount === 0 ? (
+          {thorLoading ? (
+            <p className="text-sm text-gray-500 py-8 text-center">Loading THORChain swaps...</p>
+          ) : thorCount === 0 ? (
             <div className="text-center py-8">
               <p className="text-sm text-gray-500">
                 No THORChain affiliate swaps found.
