@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession } from "@/lib/state/session";
 
@@ -28,7 +29,8 @@ export default function Nav() {
   return (
     <header className="bg-m-blue-dark-2 text-white">
       <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-3">
-        <Link href="/" className="text-xl font-bold tracking-tight">
+        <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight">
+          <Image src="/logo.svg" alt="" width={28} height={28} className="flex-shrink-0" />
           wallet2qr
         </Link>
 
