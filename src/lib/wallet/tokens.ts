@@ -1,11 +1,12 @@
 import { createPublicClient, http, fallback, erc20Abi, formatUnits, type Address, type Chain } from "viem";
-import { arbitrum, mainnet, avalanche } from "viem/chains";
+import { arbitrum, mainnet, avalanche, bsc } from "viem/chains";
 import { type NetworkConfig } from "./networks";
 
 const chainMap: Record<number, Chain> = {
   [arbitrum.id]: arbitrum,
   [mainnet.id]: mainnet,
   [avalanche.id]: avalanche,
+  [bsc.id]: bsc,
 };
 
 export function getPublicClient(network: NetworkConfig) {

@@ -175,7 +175,7 @@ function LandingContent() {
           {[
             {
               title: "Multi-Chain Support",
-              desc: "Ethereum, Arbitrum, Avalanche, and Solana. View balances, send, receive, and exchange across chains.",
+              desc: "Bitcoin, Ethereum, Arbitrum, BNB Chain, Avalanche, and Solana. View balances, send, receive, and exchange across chains.",
             },
             {
               title: "Cross-Chain Exchange",

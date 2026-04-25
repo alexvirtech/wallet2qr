@@ -6,19 +6,22 @@ import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveEvmAccount } from "@/lib/wallet/derive";
 import { getNetwork } from "@/lib/wallet/networks";
+import { getBestRoute, getRouteSummaryText } from "@/lib/wallet/routing";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import SendForm from "@/components/SendForm";
 import type { Hex } from "viem";
 
 export default function SendPage() {
   const { mnemonic, isUnlocked } = useSession();
-  const { getActiveNetworkKeys } = useSettings();
+  const { settings, getActiveNetworkKeys } = useSettings();
   const router = useRouter();
   const activeKeys = getActiveNetworkKeys().filter(
     (k) => getNetwork(k).chainType === "evm"
   );
-  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
+  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "arbitrum");
   const [txHash, setTxHash] = useState<string | null>(null);
+
+  const isSimple = settings.mode === "simple";
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -34,6 +37,11 @@ export default function SendPage() {
   }, [mnemonic]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+
+  const bestRoute = useMemo(
+    () => getBestRoute(activeKeys, settings.routingMode, 50),
+    [activeKeys, settings.routingMode]
+  );
 
   if (!isUnlocked || !account) return null;
 
@@ -51,6 +59,22 @@ export default function SendPage() {
         </div>
         <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
       </div>
+
+      {isSimple && bestRoute && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            {getRouteSummaryText(bestRoute)}
+          </p>
+        </div>
+      )}
+
+      {networkKey === "ethereum" && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3 mb-4">
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            Ethereum network fees may be high. A cheaper network may be available.
+          </p>
+        </div>
+      )}
 
       {txHash ? (
         <div className="space-y-4">

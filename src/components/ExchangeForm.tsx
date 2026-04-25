@@ -120,7 +120,7 @@ export default function ExchangeForm({
       await executeLifiRoute(
         quoteResult.route,
         privateKey,
-        fromNet.chainType,
+        fromNet.chainType as "evm" | "solana",
         fromNet.chainId,
         (updated) => {
           const step = updated.steps?.[0];

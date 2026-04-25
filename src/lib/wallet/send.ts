@@ -10,13 +10,14 @@ import {
   type Chain,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrum, mainnet, avalanche } from "viem/chains";
+import { arbitrum, mainnet, avalanche, bsc } from "viem/chains";
 import type { NetworkConfig, TokenConfig } from "./networks";
 
 const chainMap: Record<number, Chain> = {
   [arbitrum.id]: arbitrum,
   [mainnet.id]: mainnet,
   [avalanche.id]: avalanche,
+  [bsc.id]: bsc,
 };
 
 function getChain(network: NetworkConfig): Chain {

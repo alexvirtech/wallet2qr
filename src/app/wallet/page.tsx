@@ -12,7 +12,7 @@ import QRCode from "qrcode";
 
 export default function WalletPage() {
   const { mnemonic, isUnlocked } = useSession();
-  const { getActiveNetworkKeys } = useSettings();
+  const { settings, getActiveNetworkKeys } = useSettings();
   const router = useRouter();
 
   const activeKeys = getActiveNetworkKeys();
@@ -25,6 +25,8 @@ export default function WalletPage() {
   });
   const [copied, setCopied] = useState(false);
   const addressQrRef = useRef<HTMLCanvasElement>(null);
+
+  const isSimple = settings.mode === "simple";
 
   const handleNetworkChange = useCallback((key: string) => {
     setNetworkKey(key);
@@ -89,18 +91,45 @@ export default function WalletPage() {
     );
   }
 
+  const isBitcoin = network.chainType === "bitcoin";
+
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Wallet</h1>
-        <NetworkSwitcher current={networkKey} onChange={handleNetworkChange} />
+        {!isSimple && (
+          <NetworkSwitcher current={networkKey} onChange={handleNetworkChange} />
+        )}
       </div>
+
+      {isSimple && activeKeys.length > 1 && (
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+          {activeKeys.map((k) => {
+            const net = getNetwork(k);
+            return (
+              <button
+                key={k}
+                onClick={() => handleNetworkChange(k)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                  k === networkKey
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-100 dark:bg-m-blue-dark-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                {net.nativeCurrency.symbol}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4 mb-6">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <canvas ref={addressQrRef} className="rounded flex-shrink-0" />
           <div className="flex-1 min-w-0 text-center sm:text-left">
-            <p className="text-xs text-gray-400 mb-1">Your Address ({network.name})</p>
+            <p className="text-xs text-gray-400 mb-1">
+              {isSimple ? "Your Address" : `Your Address (${network.name})`}
+            </p>
             <p className="font-mono text-xs sm:text-sm break-all">{account.address}</p>
             <button
               onClick={copyAddress}
@@ -112,7 +141,7 @@ export default function WalletPage() {
         </div>
       </div>
 
-      <BalanceList network={network} address={account.address} />
+      <BalanceList network={network} address={account.address} showTotalUsd={isSimple} />
 
       <div className="flex gap-3 mt-6">
         {network.chainType === "evm" && (
@@ -129,13 +158,21 @@ export default function WalletPage() {
         >
           Receive
         </button>
-        <button
-          onClick={() => router.push("/wallet/exchange")}
-          className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
-        >
-          Exchange
-        </button>
+        {!isBitcoin && (
+          <button
+            onClick={() => router.push("/wallet/exchange")}
+            className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
+          >
+            Exchange
+          </button>
+        )}
       </div>
+
+      {isBitcoin && (
+        <p className="text-xs text-gray-400 mt-2 text-center">
+          Bitcoin is view-only. Send and exchange features coming soon.
+        </p>
+      )}
     </div>
   );
 }

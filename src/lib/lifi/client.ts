@@ -6,7 +6,7 @@ import {
   type Chain,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { mainnet, arbitrum, avalanche } from "viem/chains";
+import { mainnet, arbitrum, avalanche, bsc } from "viem/chains";
 import { allNetworks } from "@/lib/wallet/networks";
 
 const INTEGRATOR = process.env.NEXT_PUBLIC_LIFI_INTEGRATOR || "wallet2qr";
@@ -15,6 +15,7 @@ const chainMap: Record<number, Chain> = {
   1: mainnet,
   42161: arbitrum,
   43114: avalanche,
+  56: bsc,
 };
 
 function getRpcUrl(chainId: number): string | undefined {

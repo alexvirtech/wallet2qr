@@ -9,6 +9,12 @@ import {
   type ReactNode,
 } from "react";
 import { allNetworks } from "./networks";
+import { getAssetsForNetwork } from "./assets";
+
+export type UiMode = "simple" | "advanced";
+export type PaymentAssetPref = "USDT" | "USDC" | "auto";
+export type PaymentNetworkPref = "auto" | string;
+export type RoutingMode = "lowest_fee" | "fastest" | "best_liquidity" | "manual";
 
 interface TokenSetting {
   added: boolean;
@@ -23,6 +29,10 @@ interface NetworkSetting {
 
 export interface WalletSettings {
   networks: Record<string, NetworkSetting>;
+  mode: UiMode;
+  preferredPaymentAsset: PaymentAssetPref;
+  preferredPaymentNetwork: PaymentNetworkPref;
+  routingMode: RoutingMode;
 }
 
 const STORAGE_KEY = "wallet2qr_settings";
@@ -32,12 +42,23 @@ function buildDefaultSettings(): WalletSettings {
   for (const [key, net] of Object.entries(allNetworks)) {
     const tokens: Record<string, TokenSetting> = {};
     tokens[net.nativeCurrency.symbol] = { added: true, visible: true };
+
+    const assetDefs = getAssetsForNetwork(key);
     for (const t of net.tokens) {
-      tokens[t.symbol] = { added: true, visible: true };
+      const def = assetDefs.find((a) => a.symbol === t.symbol);
+      const isVisible = def ? def.isDefaultVisible : true;
+      tokens[t.symbol] = { added: isVisible, visible: isVisible };
     }
+
     networks[key] = { added: net.isDefault, visible: true, tokens };
   }
-  return { networks };
+  return {
+    networks,
+    mode: "simple",
+    preferredPaymentAsset: "auto",
+    preferredPaymentNetwork: "auto",
+    routingMode: "lowest_fee",
+  };
 }
 
 function loadSettings(): WalletSettings {
@@ -47,6 +68,12 @@ function loadSettings(): WalletSettings {
     if (!raw) return buildDefaultSettings();
     const stored = JSON.parse(raw) as WalletSettings;
     const defaults = buildDefaultSettings();
+
+    if (!stored.mode) stored.mode = defaults.mode;
+    if (!stored.preferredPaymentAsset) stored.preferredPaymentAsset = defaults.preferredPaymentAsset;
+    if (!stored.preferredPaymentNetwork) stored.preferredPaymentNetwork = defaults.preferredPaymentNetwork;
+    if (!stored.routingMode) stored.routingMode = defaults.routingMode;
+
     for (const key of Object.keys(defaults.networks)) {
       if (!stored.networks[key]) {
         stored.networks[key] = defaults.networks[key];
@@ -72,6 +99,10 @@ function saveSettings(s: WalletSettings) {
 
 interface SettingsContextValue {
   settings: WalletSettings;
+  setMode: (mode: UiMode) => void;
+  setPaymentAssetPref: (pref: PaymentAssetPref) => void;
+  setPaymentNetworkPref: (pref: PaymentNetworkPref) => void;
+  setRoutingMode: (mode: RoutingMode) => void;
   addNetwork: (key: string) => void;
   removeNetwork: (key: string) => void;
   toggleNetworkVisible: (key: string) => void;
@@ -95,6 +126,42 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings(next);
     saveSettings(next);
   }, []);
+
+  const setMode = useCallback(
+    (mode: UiMode) => {
+      const next = structuredClone(settings);
+      next.mode = mode;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setPaymentAssetPref = useCallback(
+    (pref: PaymentAssetPref) => {
+      const next = structuredClone(settings);
+      next.preferredPaymentAsset = pref;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setPaymentNetworkPref = useCallback(
+    (pref: PaymentNetworkPref) => {
+      const next = structuredClone(settings);
+      next.preferredPaymentNetwork = pref;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setRoutingMode = useCallback(
+    (mode: RoutingMode) => {
+      const next = structuredClone(settings);
+      next.routingMode = mode;
+      persist(next);
+    },
+    [settings, persist]
+  );
 
   const addNetwork = useCallback(
     (key: string) => {
@@ -188,6 +255,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     <SettingsContext.Provider
       value={{
         settings,
+        setMode,
+        setPaymentAssetPref,
+        setPaymentNetworkPref,
+        setRoutingMode,
         addNetwork,
         removeNetwork,
         toggleNetworkVisible,
