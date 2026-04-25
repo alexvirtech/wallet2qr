@@ -6,6 +6,7 @@ import type { ThorSwapRow, LifiSwapRow } from "@/app/admin/page";
 interface Props {
   thorSwaps: ThorSwapRow[];
   lifiSwaps: LifiSwapRow[];
+  thorAffiliate?: string;
 }
 
 function formatDate(ts: number) {
@@ -24,7 +25,7 @@ function assetLabel(asset: string) {
 
 type Tab = "thorchain" | "lifi";
 
-export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
+export default function AdminDashboard({ thorSwaps, lifiSwaps, thorAffiliate }: Props) {
   const [tab, setTab] = useState<Tab>("thorchain");
 
   const thorCount = thorSwaps.length;
@@ -72,9 +73,14 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
       {tab === "thorchain" && (
         <div className="overflow-x-auto">
           {thorCount === 0 ? (
-            <p className="text-sm text-gray-500 py-8 text-center">
-              No THORChain affiliate swaps yet. Swaps will appear once users trade via the THORChain tab.
-            </p>
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-500">
+                No THORChain affiliate swaps found.
+              </p>
+              <p className="text-xs text-gray-400 mt-2 font-mono break-all">
+                THOR_AFFILIATE: {thorAffiliate ? `"${thorAffiliate}"` : "(not set)"}
+              </p>
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead>

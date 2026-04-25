@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { type NetworkConfig } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
 import { getSolNativeBalance, getSplTokenBalance } from "@/lib/wallet/solana";
@@ -250,6 +251,7 @@ function AssetDetailModal({
   chainType: string;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const copyText = (text: string, field: string) => {
@@ -265,6 +267,9 @@ function AssetDetailModal({
         ? `${blockExplorer}/address/${asset.address}`
         : `${blockExplorer}/token/${asset.address}`;
 
+  const canSend = chainType === "evm" || chainType === "bitcoin";
+  const canExchange = chainType !== "solana";
+
   return (
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -274,7 +279,7 @@ function AssetDetailModal({
         className="bg-white dark:bg-m-blue-dark-2 rounded-xl w-full max-w-md shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700`}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full ${AVATAR_COLORS[asset.category]} flex items-center justify-center text-white font-bold`}>
               {asset.symbol[0]}
@@ -296,6 +301,31 @@ function AssetDetailModal({
           <div className="flex justify-between items-baseline">
             <span className="text-2xl font-bold font-mono">{asset.balance}</span>
             <span className="text-sm text-gray-400">{asset.usdValue}</span>
+          </div>
+
+          <div className="flex gap-2">
+            {canSend && (
+              <button
+                onClick={() => router.push("/wallet/send")}
+                className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-colors"
+              >
+                Send
+              </button>
+            )}
+            <button
+              onClick={() => router.push("/wallet/receive")}
+              className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-colors"
+            >
+              Receive
+            </button>
+            {canExchange && (
+              <button
+                onClick={() => router.push("/wallet/exchange")}
+                className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded-lg text-sm transition-colors"
+              >
+                Exchange
+              </button>
+            )}
           </div>
 
           <DetailRow label="Network" value={networkName} />

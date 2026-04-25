@@ -143,13 +143,22 @@ async function fetchLifiSwaps(): Promise<LifiSwapRow[]> {
   }
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage() {
+  const thorAffiliate =
+    process.env.THOR_AFFILIATE || process.env.NEXT_PUBLIC_THOR_AFFILIATE || "";
+
   const [thorSwaps, lifiSwaps] = await Promise.all([
     fetchThorchainSwaps(),
     fetchLifiSwaps(),
   ]);
 
   return (
-    <AdminDashboard thorSwaps={thorSwaps} lifiSwaps={lifiSwaps} />
+    <AdminDashboard
+      thorSwaps={thorSwaps}
+      lifiSwaps={lifiSwaps}
+      thorAffiliate={thorAffiliate}
+    />
   );
 }

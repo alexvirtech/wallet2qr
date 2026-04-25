@@ -161,28 +161,9 @@ export default function WalletPage() {
         networkKey={networkKey}
       />
 
-      <div className="flex gap-3 mt-6">
-        {(network.chainType === "evm" || network.chainType === "bitcoin") && (
-          <button
-            onClick={() => router.push("/wallet/send")}
-            className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
-          >
-            Send
-          </button>
-        )}
-        <button
-          onClick={() => router.push("/wallet/receive")}
-          className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
-        >
-          Receive
-        </button>
-        <button
-          onClick={() => router.push("/wallet/exchange")}
-          className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
-        >
-          Exchange
-        </button>
-      </div>
+      <p className="text-xs text-gray-400 mt-4 text-center">
+        Tap an asset for details, send, receive, or exchange.
+      </p>
     </div>
   );
 }
