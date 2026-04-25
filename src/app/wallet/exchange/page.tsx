@@ -6,19 +6,25 @@ import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveAccount } from "@/lib/wallet/derive";
-import { getNetwork } from "@/lib/wallet/networks";
+import { getNetwork, allNetworks } from "@/lib/wallet/networks";
+import { getThorSupportedNetworks } from "@/lib/thorchain/api";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import ExchangeForm from "@/components/ExchangeForm";
+import ThorSwapForm from "@/components/ThorSwapForm";
 import type { Hex, Address } from "viem";
+
+type SwapProvider = "lifi" | "thorchain";
 
 export default function ExchangePage() {
   const { mnemonic, isUnlocked } = useSession();
   const { getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
-  const activeKeys = getActiveNetworkKeys().filter(
+  const allActiveKeys = getActiveNetworkKeys();
+  const evmKeys = allActiveKeys.filter(
     (k) => getNetwork(k).chainType !== "bitcoin"
   );
-  const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
+  const [networkKey, setNetworkKey] = useState(evmKeys[0] ?? "ethereum");
+  const [provider, setProvider] = useState<SwapProvider>("lifi");
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -36,6 +42,20 @@ export default function ExchangePage() {
     }
   }, [mnemonic, network.chainType, derivationPath]);
 
+  const thorAddresses = useMemo(() => {
+    if (!mnemonic) return {};
+    const result: Record<string, string> = {};
+    for (const key of getThorSupportedNetworks()) {
+      const net = allNetworks[key];
+      if (!net) continue;
+      try {
+        const path = getDerivationPath(key);
+        result[key] = deriveAccount(mnemonic, net.chainType, path).address;
+      } catch {}
+    }
+    return result;
+  }, [mnemonic, getDerivationPath]);
+
   if (!isUnlocked || !account) return null;
 
   return (
@@ -48,21 +68,56 @@ export default function ExchangePage() {
         </div>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Exchange</h1>
-          <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+          {provider === "lifi" && (
+            <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+          )}
         </div>
       </div>
 
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Swap tokens across EVM chains and Solana via LI.FI. Bitcoin is not
-        supported — use a dedicated bridge like THORChain or Chainflip for
-        BTC swaps.
-      </p>
+      <div className="flex border-b border-gray-200 dark:border-gray-600 mb-4">
+        <button
+          onClick={() => setProvider("lifi")}
+          className={`py-2 px-4 text-sm font-bold border-b-2 transition-colors ${
+            provider === "lifi"
+              ? "border-blue-500 text-blue-500"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          LI.FI
+        </button>
+        <button
+          onClick={() => setProvider("thorchain")}
+          className={`py-2 px-4 text-sm font-bold border-b-2 transition-colors ${
+            provider === "thorchain"
+              ? "border-blue-500 text-blue-500"
+              : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          THORChain
+        </button>
+      </div>
 
-      <ExchangeForm
-        address={account.address as Address}
-        privateKey={account.privateKey as Hex}
-        currentNetwork={networkKey}
-      />
+      {provider === "lifi" && (
+        <>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Swap tokens across EVM chains and Solana. For BTC swaps, use the THORChain tab.
+          </p>
+          <ExchangeForm
+            address={account.address as Address}
+            privateKey={account.privateKey as Hex}
+            currentNetwork={networkKey}
+          />
+        </>
+      )}
+
+      {provider === "thorchain" && (
+        <>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Cross-chain swaps via THORChain. Supports Bitcoin, Ethereum, BNB Chain, and Avalanche.
+          </p>
+          <ThorSwapForm addresses={thorAddresses} />
+        </>
+      )}
     </div>
   );
 }
