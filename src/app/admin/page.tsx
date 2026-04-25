@@ -57,7 +57,7 @@ async function fetchThorchainSwaps(): Promise<ThorSwapRow[]> {
   if (!affiliate) return [];
   try {
     const url = `https://gateway.liquify.com/chain/thorchain_midgard/v2/actions?address=${affiliate}&type=swap&limit=100`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
     const actions = (data.actions ?? []) as MidgardAction[];
@@ -112,7 +112,7 @@ async function fetchLifiSwaps(): Promise<LifiSwapRow[]> {
   const integrator = process.env.NEXT_PUBLIC_LIFI_INTEGRATOR || "wallet2qr";
   try {
     const url = `https://li.quest/v1/analytics/transfers?integrator=${integrator}&limit=100`;
-    const res = await fetch(url, { next: { revalidate: 60 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.transfers ?? []).map((t: LifiTransfer): LifiSwapRow => {
