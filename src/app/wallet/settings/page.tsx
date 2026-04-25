@@ -326,59 +326,57 @@ export default function SettingsPage() {
                     {isExpanded && (
                       <div className="px-4 pb-4">
                         {/* Derivation path */}
-                        {isAdvanced && (
-                          <div className="mb-3 p-2 bg-gray-100 dark:bg-m-blue-dark-4 rounded text-xs">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-gray-500">Derivation Path</span>
-                              <div className="flex gap-1">
-                                <button
-                                  onClick={() => handleAutoIncrement(key)}
-                                  className="text-blue-500 hover:text-blue-700 text-xs"
-                                  title="Auto-increment last index"
-                                >
-                                  +1
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditPathNet(key);
-                                    setEditPathValue(currentPath);
-                                  }}
-                                  className="text-blue-500 hover:text-blue-700 text-xs"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            </div>
-                            {isEditingPath ? (
-                              <div className="flex gap-1 mt-1">
-                                <input
-                                  type="text"
-                                  value={editPathValue}
-                                  onChange={(e) => setEditPathValue(e.target.value)}
-                                  className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <button
-                                  onClick={handleSavePath}
-                                  className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  onClick={() => setEditPathNet(null)}
-                                  className="text-xs text-gray-400 hover:text-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="font-mono">{currentPath}</span>
-                            )}
-                            <div className="mt-1 font-mono text-gray-400 break-all">
-                              {addresses[key]}
+                        <div className="mb-3 p-2 bg-gray-100 dark:bg-m-blue-dark-4 rounded text-xs">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-gray-500">Derivation Path</span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleAutoIncrement(key)}
+                                className="text-blue-500 hover:text-blue-700 text-xs font-bold"
+                                title="Auto-increment last index"
+                              >
+                                +1
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditPathNet(key);
+                                  setEditPathValue(currentPath);
+                                }}
+                                className="text-blue-500 hover:text-blue-700 text-xs"
+                              >
+                                Edit
+                              </button>
                             </div>
                           </div>
-                        )}
+                          {isEditingPath ? (
+                            <div className="flex gap-1 mt-1">
+                              <input
+                                type="text"
+                                value={editPathValue}
+                                onChange={(e) => setEditPathValue(e.target.value)}
+                                className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <button
+                                onClick={handleSavePath}
+                                className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => setEditPathNet(null)}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="font-mono">{currentPath}</span>
+                          )}
+                          <div className="mt-1 font-mono text-gray-400 break-all">
+                            {addresses[key]}
+                          </div>
+                        </div>
 
                         {/* Token list */}
                         <div className="space-y-1 ml-2">
@@ -443,8 +441,8 @@ export default function SettingsPage() {
                           })}
                         </div>
 
-                        {/* Add custom token (Advanced) */}
-                        {isAdvanced && net.chainType !== "bitcoin" && (
+                        {/* Add custom token */}
+                        {net.chainType !== "bitcoin" && (
                           <div className="mt-3">
                             {addTokenNet === key ? (
                               <div className="p-3 border border-gray-200 dark:border-gray-600 rounded space-y-2">

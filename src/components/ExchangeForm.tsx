@@ -45,7 +45,9 @@ export default function ExchangeForm({
 }: ExchangeFormProps) {
   const { getActiveNetworkKeys } = useSettings();
   const activeKeys = getActiveNetworkKeys();
-  const exchangeKeys = allNetworkKeys;
+  const exchangeKeys = allNetworkKeys.filter(
+    (k) => allNetworks[k].chainType !== "bitcoin"
+  );
 
   const [fromChain, setFromChain] = useState(currentNetwork);
   const [toChain, setToChain] = useState(

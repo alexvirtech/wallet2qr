@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { type NetworkConfig } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
 import { getSolNativeBalance, getSplTokenBalance } from "@/lib/wallet/solana";
@@ -35,13 +35,14 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
   const [selectedAsset, setSelectedAsset] = useState<BalanceItem | null>(null);
   const { getVisibleTokens, getDerivationPath } = useSettings();
 
-  const visibleSymbols = getVisibleTokens(networkKey);
-  const expectedCount = visibleSymbols.length;
+  const expectedCount = getVisibleTokens(networkKey).length;
+  const prevKeyRef = useRef(networkKey);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
+      const visibleSymbols = getVisibleTokens(networkKey);
       const prices = await fetchPrices();
       const assetDefs = getAssetsForNetwork(network.key);
 
@@ -106,11 +107,18 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
     } finally {
       setLoading(false);
     }
-  }, [network, address, visibleSymbols]);
+  }, [network, address, networkKey, getVisibleTokens]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (prevKeyRef.current !== networkKey) {
+      prevKeyRef.current = networkKey;
+      setBalances([]);
+    }
+  }, [networkKey]);
 
   const totalUsd = balances.reduce((sum, b) => sum + b.usdNum, 0);
   const derivationPath = getDerivationPath(networkKey);

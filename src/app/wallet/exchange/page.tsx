@@ -14,7 +14,9 @@ export default function ExchangePage() {
   const { mnemonic, isUnlocked } = useSession();
   const { getActiveNetworkKeys } = useSettings();
   const router = useRouter();
-  const activeKeys = getActiveNetworkKeys();
+  const activeKeys = getActiveNetworkKeys().filter(
+    (k) => getNetwork(k).chainType !== "bitcoin"
+  );
   const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "ethereum");
 
   useEffect(() => {
@@ -50,7 +52,9 @@ export default function ExchangePage() {
       </div>
 
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Swap tokens across Ethereum, Arbitrum, Avalanche, and Solana via LI.FI.
+        Swap tokens across EVM chains and Solana via LI.FI. Bitcoin is not
+        supported — use a dedicated bridge like THORChain or Chainflip for
+        BTC swaps.
       </p>
 
       <ExchangeForm
