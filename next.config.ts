@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://authjs.dev https://*.googleusercontent.com",
               "media-src 'self' blob:",
-              "connect-src 'self' https://*.llamarpc.com https://*.infura.io https://*.alchemy.com https://*.publicnode.com https://api.coingecko.com https://li.quest https://*.lifi.tools https://api.mainnet-beta.solana.com https://*.solana.com https://accounts.google.com https://*.googleapis.com",
+              "connect-src 'self' https://*.llamarpc.com https://*.infura.io https://*.alchemy.com https://*.publicnode.com https://api.coingecko.com https://li.quest https://*.lifi.tools https://api.mainnet-beta.solana.com https://*.solana.com https://accounts.google.com https://*.googleapis.com https://mempool.space https://*.ninerealms.com",
               "font-src 'self'",
               "worker-src 'self' blob:",
               "frame-src 'none'",

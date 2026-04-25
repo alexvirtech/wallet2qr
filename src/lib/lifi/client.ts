@@ -9,7 +9,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { mainnet, arbitrum, avalanche, bsc } from "viem/chains";
 import { allNetworks } from "@/lib/wallet/networks";
 
-const INTEGRATOR = process.env.NEXT_PUBLIC_LIFI_INTEGRATOR || "wallet2qr";
+const INTEGRATOR = process.env.NEXT_PUBLIC_LIFI_INTEGRATOR ?? "wallet2qr";
 
 const chainMap: Record<number, Chain> = {
   1: mainnet,

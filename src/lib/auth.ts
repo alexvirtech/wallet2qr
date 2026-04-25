@@ -14,6 +14,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn({ user }) {
       return user.email === ADMIN_EMAIL;
     },
+    redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${url}`;
+      if (url.startsWith(baseUrl)) return url;
+      return `${baseUrl}/admin`;
+    },
   },
   pages: {
     error: "/admin/auth-error",

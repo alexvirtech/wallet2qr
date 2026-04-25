@@ -56,11 +56,15 @@ async function fetchThorchainSwaps(): Promise<ThorSwapRow[]> {
   const affiliate = process.env.NEXT_PUBLIC_THOR_AFFILIATE;
   if (!affiliate) return [];
   try {
-    const url = `https://midgard.ninerealms.com/v2/actions?affiliate=${affiliate}&type=swap&limit=100`;
+    const url = `https://midgard.ninerealms.com/v2/actions?address=${affiliate}&type=swap&limit=100`;
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
-    return parseMidgard(data.actions ?? []);
+    const actions = (data.actions ?? []) as MidgardAction[];
+    const filtered = actions.filter(
+      (a) => a.metadata?.swap?.affiliateAddress === affiliate
+    );
+    return parseMidgard(filtered);
   } catch {
     return [];
   }

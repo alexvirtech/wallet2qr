@@ -145,8 +145,7 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
                 No LI.FI swaps recorded yet.
               </p>
               <p className="text-xs text-gray-400 mt-2">
-                Swap logging requires <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">BLOB_READ_WRITE_TOKEN</code> and{" "}
-                <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">SWAP_LOG_SECRET</code> environment variables.
+                Swap logging requires <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">BLOB_READ_WRITE_TOKEN</code> environment variable.
               </p>
             </div>
           ) : (
