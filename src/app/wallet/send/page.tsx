@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveEvmAccount } from "@/lib/wallet/derive";
@@ -13,7 +14,7 @@ import type { Hex } from "viem";
 
 export default function SendPage() {
   const { mnemonic, isUnlocked } = useSession();
-  const { settings, getActiveNetworkKeys } = useSettings();
+  const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
   const activeKeys = getActiveNetworkKeys().filter(
     (k) => getNetwork(k).chainType === "evm"
@@ -22,6 +23,7 @@ export default function SendPage() {
   const [txHash, setTxHash] = useState<string | null>(null);
 
   const isSimple = settings.mode === "simple";
+  const derivationPath = getDerivationPath(networkKey);
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -30,11 +32,11 @@ export default function SendPage() {
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveEvmAccount(mnemonic);
+      return deriveEvmAccount(mnemonic, derivationPath);
     } catch {
       return null;
     }
-  }, [mnemonic]);
+  }, [mnemonic, derivationPath]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
 
@@ -48,12 +50,11 @@ export default function SendPage() {
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
       <div className="mb-6">
-        <button
-          onClick={() => router.push("/wallet")}
-          className="text-blue-500 hover:text-blue-700 text-sm mb-3 inline-block"
-        >
-          &larr; Back to Wallet
-        </button>
+        <div className="text-xs text-gray-400 mb-1">
+          <Link href="/wallet" className="hover:text-blue-500 transition-colors">Wallet</Link>
+          <span className="mx-1">/</span>
+          <span>Send</span>
+        </div>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Send</h1>
           <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />

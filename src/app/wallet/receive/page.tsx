@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useRef, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveAccount } from "@/lib/wallet/derive";
@@ -12,7 +13,7 @@ import QRCode from "qrcode";
 
 export default function ReceivePage() {
   const { mnemonic, isUnlocked } = useSession();
-  const { settings, getActiveNetworkKeys } = useSettings();
+  const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
   const activeKeys = getActiveNetworkKeys();
   const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "arbitrum");
@@ -24,6 +25,7 @@ export default function ReceivePage() {
   const paymentCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const isSimple = settings.mode === "simple";
+  const derivationPath = getDerivationPath(networkKey);
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -34,11 +36,11 @@ export default function ReceivePage() {
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveAccount(mnemonic, network.chainType);
+      return deriveAccount(mnemonic, network.chainType, derivationPath);
     } catch {
       return null;
     }
-  }, [mnemonic, network.chainType]);
+  }, [mnemonic, network.chainType, derivationPath]);
 
   useEffect(() => {
     if (canvasRef.current && account) {
@@ -57,7 +59,8 @@ export default function ReceivePage() {
       const net = allNetworks[key];
       if (!net) continue;
       try {
-        const acc = deriveAccount(mnemonic, net.chainType);
+        const path = getDerivationPath(key);
+        const acc = deriveAccount(mnemonic, net.chainType, path);
         addresses.push({ networkId: key, address: acc.address });
       } catch {}
     }
@@ -85,6 +88,7 @@ export default function ReceivePage() {
     memo,
     settings.preferredPaymentAsset,
     settings.preferredPaymentNetwork,
+    getDerivationPath,
   ]);
 
   useEffect(() => {
@@ -107,20 +111,18 @@ export default function ReceivePage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/wallet")}
-            className="text-blue-500 hover:text-blue-700 text-sm"
-          >
-            &larr; Back
-          </button>
-          <h1 className="text-2xl font-bold">Receive</h1>
+      <div className="mb-6">
+        <div className="text-xs text-gray-400 mb-1">
+          <Link href="/wallet" className="hover:text-blue-500 transition-colors">Wallet</Link>
+          <span className="mx-1">/</span>
+          <span>Receive</span>
         </div>
-        <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Receive</h1>
+          <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+        </div>
       </div>
 
-      {/* Simple address QR */}
       <div className="flex flex-col items-center gap-4 mb-8">
         <p className="text-sm text-gray-500">
           {isSimple
@@ -141,7 +143,6 @@ export default function ReceivePage() {
         </button>
       </div>
 
-      {/* Payment Request QR Builder */}
       <div className="border-t border-gray-200 dark:border-gray-600 pt-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold">Payment Request QR</h2>

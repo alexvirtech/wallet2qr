@@ -2,12 +2,14 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import type { UiMode, PaymentAssetPref, PaymentNetworkPref, RoutingMode, CustomToken } from "@/lib/wallet/settings";
 import { allNetworks, allNetworkKeys } from "@/lib/wallet/networks";
 import { getAssetsForNetwork } from "@/lib/wallet/assets";
-import { deriveAccount, incrementDerivationPath } from "@/lib/wallet/derive";
+import { deriveAccount } from "@/lib/wallet/derive";
+import { getSchemesForChainType } from "@/lib/wallet/derivationSchemes";
 import { buildQrUrl } from "@/lib/compat/qrPayload";
 import PasswordModal from "@/components/PasswordModal";
 import QrCanvas from "@/components/QrCanvas";
@@ -38,7 +40,10 @@ export default function SettingsPage() {
     toggleTokenVisible,
     addCustomToken,
     removeCustomToken,
-    setDerivationPath,
+    addAccount,
+    removeAccount,
+    setActiveAccount,
+    setScheme,
     getDerivationPath,
     getCustomTokensForNetwork,
   } = useSettings();
@@ -52,8 +57,8 @@ export default function SettingsPage() {
   const [customSymbol, setCustomSymbol] = useState("");
   const [customName, setCustomName] = useState("");
   const [customDecimals, setCustomDecimals] = useState("18");
-  const [editPathNet, setEditPathNet] = useState<string | null>(null);
-  const [editPathValue, setEditPathValue] = useState("");
+  const [customPathNet, setCustomPathNet] = useState<string | null>(null);
+  const [customPathValue, setCustomPathValue] = useState("");
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -63,19 +68,18 @@ export default function SettingsPage() {
     setExpandedNets((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  const addresses = useMemo(() => {
-    if (!mnemonic) return {};
-    const result: Record<string, string> = {};
-    for (const [key, net] of Object.entries(allNetworks)) {
+  const resolveAddress = useCallback(
+    (networkKey: string, path: string) => {
+      if (!mnemonic) return "—";
       try {
-        const path = settings.networks[key]?.derivationPath;
-        result[key] = deriveAccount(mnemonic, net.chainType, path).address;
+        const net = allNetworks[networkKey];
+        return deriveAccount(mnemonic, net.chainType, path).address;
       } catch {
-        result[key] = "—";
+        return "—";
       }
-    }
-    return result;
-  }, [mnemonic, settings]);
+    },
+    [mnemonic]
+  );
 
   const qrData = useMemo(() => {
     if (!showMnemonic || !mnemonic || !password) return null;
@@ -122,21 +126,12 @@ export default function SettingsPage() {
     setAddTokenNet(null);
   }, [addTokenNet, customSymbol, customAddr, customName, customDecimals, addCustomToken]);
 
-  const handleSavePath = useCallback(() => {
-    if (!editPathNet || !editPathValue.trim()) return;
-    setDerivationPath(editPathNet, editPathValue.trim());
-    setEditPathNet(null);
-    setEditPathValue("");
-  }, [editPathNet, editPathValue, setDerivationPath]);
-
-  const handleAutoIncrement = useCallback(
-    (key: string) => {
-      const current = getDerivationPath(key);
-      const next = incrementDerivationPath(current);
-      setDerivationPath(key, next);
-    },
-    [getDerivationPath, setDerivationPath]
-  );
+  const handleAddCustomPath = useCallback(() => {
+    if (!customPathNet || !customPathValue.trim()) return;
+    addAccount(customPathNet, customPathValue.trim());
+    setCustomPathNet(null);
+    setCustomPathValue("");
+  }, [customPathNet, customPathValue, addAccount]);
 
   const activeKeys = allNetworkKeys.filter((k) => settings.networks[k]?.added);
   const availableKeys = allNetworkKeys.filter(
@@ -155,13 +150,12 @@ export default function SettingsPage() {
   return (
     <div className="w-full max-w-3xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/wallet")}
-            className="text-blue-500 hover:text-blue-700 text-sm"
-          >
-            &larr; Back
-          </button>
+        <div>
+          <div className="text-xs text-gray-400 mb-1">
+            <Link href="/wallet" className="hover:text-blue-500 transition-colors">Wallet</Link>
+            <span className="mx-1">/</span>
+            <span>Settings</span>
+          </div>
           <h1 className="text-2xl font-bold">Settings</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -183,7 +177,6 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-gray-200 dark:border-gray-600 mb-6 overflow-x-auto">
         {(
           [
@@ -279,15 +272,16 @@ export default function SettingsPage() {
                   (t) => t.added && t.visible
                 ).length;
                 const isExpanded = expandedNets[key] ?? false;
-                const currentPath = getDerivationPath(key);
-                const isEditingPath = editPathNet === key;
+                const accounts = ns.accounts ?? [];
+                const activeAccIdx = ns.activeAccountIndex ?? 0;
+                const schemes = getSchemesForChainType(net.chainType);
+                const currentSchemeId = ns.schemeId || schemes[0]?.id;
 
                 return (
                   <div
                     key={key}
                     className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg overflow-hidden"
                   >
-                    {/* Collapsible header */}
                     <div
                       className="flex items-center justify-between p-4 cursor-pointer select-none"
                       onClick={() => toggleExpanded(key)}
@@ -308,6 +302,7 @@ export default function SettingsPage() {
                           <span className="font-bold">{net.name}</span>
                           <span className="text-xs text-gray-400 ml-2">
                             {net.nativeCurrency.symbol} &middot; {enabledCount} assets
+                            {accounts.length > 1 && ` &middot; ${accounts.length} accounts`}
                           </span>
                         </div>
                       </div>
@@ -322,59 +317,107 @@ export default function SettingsPage() {
                       </button>
                     </div>
 
-                    {/* Expanded content */}
                     {isExpanded && (
-                      <div className="px-4 pb-4">
-                        {/* Derivation path */}
-                        <div className="mb-3 p-2 bg-gray-100 dark:bg-m-blue-dark-4 rounded text-xs">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-gray-500">Derivation Path</span>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleAutoIncrement(key)}
-                                className="text-blue-500 hover:text-blue-700 text-xs font-bold"
-                                title="Auto-increment last index"
-                              >
-                                +1
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditPathNet(key);
-                                  setEditPathValue(currentPath);
-                                }}
-                                className="text-blue-500 hover:text-blue-700 text-xs"
-                              >
-                                Edit
-                              </button>
+                      <div className="px-4 pb-4 space-y-4">
+                        {/* Derivation scheme + accounts */}
+                        <div className="p-3 bg-gray-100 dark:bg-m-blue-dark-4 rounded-lg space-y-3">
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">
+                              Derivation Scheme
+                            </label>
+                            <select
+                              value={currentSchemeId}
+                              onChange={(e) => setScheme(key, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                            >
+                              {schemes.map((s) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-gray-500 font-bold">
+                              Accounts
+                            </label>
+                            <div className="mt-1 space-y-1">
+                              {accounts.map((acc, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center gap-2 p-2 rounded text-xs cursor-pointer transition-colors ${
+                                    idx === activeAccIdx
+                                      ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+                                      : "hover:bg-gray-200 dark:hover:bg-gray-700"
+                                  }`}
+                                  onClick={(e) => { e.stopPropagation(); setActiveAccount(key, idx); }}
+                                >
+                                  <span className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${
+                                    idx === activeAccIdx
+                                      ? "border-blue-500 bg-blue-500"
+                                      : "border-gray-400"
+                                  }`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold">{acc.label}</span>
+                                      <span className="font-mono text-gray-400">{acc.path}</span>
+                                    </div>
+                                    <p className="font-mono text-gray-400 truncate">
+                                      {resolveAddress(key, acc.path)}
+                                    </p>
+                                  </div>
+                                  {idx > 0 && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); removeAccount(key, idx); }}
+                                      className="text-gray-400 hover:text-m-red text-sm flex-shrink-0"
+                                      title="Remove account"
+                                    >
+                                      &times;
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </div>
-                          {isEditingPath ? (
-                            <div className="flex gap-1 mt-1">
-                              <input
-                                type="text"
-                                value={editPathValue}
-                                onChange={(e) => setEditPathValue(e.target.value)}
-                                className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-                                onClick={(e) => e.stopPropagation()}
-                              />
+
+                          <div className="flex gap-3">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); addAccount(key); }}
+                              className="text-xs text-blue-500 hover:text-blue-700 font-bold"
+                            >
+                              + Add Account
+                            </button>
+                            {customPathNet === key ? (
+                              <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="text"
+                                  value={customPathValue}
+                                  onChange={(e) => setCustomPathValue(e.target.value)}
+                                  placeholder="m/44'/60'/0'/0/5"
+                                  className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                />
+                                <button
+                                  onClick={handleAddCustomPath}
+                                  disabled={!customPathValue.trim()}
+                                  className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded disabled:opacity-50"
+                                >
+                                  Add
+                                </button>
+                                <button
+                                  onClick={() => setCustomPathNet(null)}
+                                  className="text-xs text-gray-400 hover:text-gray-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
                               <button
-                                onClick={handleSavePath}
-                                className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded"
+                                onClick={(e) => { e.stopPropagation(); setCustomPathNet(key); }}
+                                className="text-xs text-purple-500 hover:text-purple-700 font-bold"
                               >
-                                Save
+                                + Custom Path
                               </button>
-                              <button
-                                onClick={() => setEditPathNet(null)}
-                                className="text-xs text-gray-400 hover:text-gray-600"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="font-mono">{currentPath}</span>
-                          )}
-                          <div className="mt-1 font-mono text-gray-400 break-all">
-                            {addresses[key]}
+                            )}
                           </div>
                         </div>
 
@@ -443,7 +486,7 @@ export default function SettingsPage() {
 
                         {/* Add custom token */}
                         {net.chainType !== "bitcoin" && (
-                          <div className="mt-3">
+                          <div>
                             {addTokenNet === key ? (
                               <div className="p-3 border border-gray-200 dark:border-gray-600 rounded space-y-2">
                                 <p className="text-xs font-bold text-gray-600 dark:text-gray-300">
@@ -537,11 +580,9 @@ export default function SettingsPage() {
                     >
                       <div className="min-w-0 flex-1 mr-3">
                         <span className="font-bold">{net.name}</span>
-                        {isAdvanced && (
-                          <span className="text-xs text-gray-400 ml-2 font-mono">
-                            {net.derivationPath}
-                          </span>
-                        )}
+                        <span className="text-xs text-gray-400 ml-2 font-mono">
+                          {net.derivationPath}
+                        </span>
                         <div className="text-xs text-gray-400 mt-1">
                           Assets: {net.nativeCurrency.symbol}
                           {net.tokens.length > 0 &&

@@ -56,7 +56,7 @@ export function deriveEvmAccount(mnemonic: string, path?: string) {
 
 export function deriveAccount(mnemonic: string, chainType: ChainType, path?: string) {
   if (chainType === "solana") {
-    const sol = deriveSolanaAccount(mnemonic);
+    const sol = deriveSolanaAccount(mnemonic, path);
     return { address: sol.address, privateKey: sol.privateKey };
   }
   if (chainType === "bitcoin") {

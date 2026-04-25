@@ -28,6 +28,27 @@ interface BalanceListProps {
   networkKey: string;
 }
 
+const BORDER_COLORS: Record<AssetCategory, string> = {
+  gas: "border-l-orange-500",
+  stablecoin: "border-l-green-500",
+  defi: "border-l-purple-500",
+  ecosystem: "border-l-blue-500",
+};
+
+const AVATAR_COLORS: Record<AssetCategory, string> = {
+  gas: "bg-orange-500",
+  stablecoin: "bg-green-500",
+  defi: "bg-purple-500",
+  ecosystem: "bg-blue-500",
+};
+
+const CATEGORY_LABELS: Record<AssetCategory, string> = {
+  gas: "Gas",
+  stablecoin: "Stable",
+  defi: "DeFi",
+  ecosystem: "Eco",
+};
+
 export default function BalanceList({ network, address, showTotalUsd, networkKey }: BalanceListProps) {
   const [balances, setBalances] = useState<BalanceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,9 +146,9 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-sm text-gray-600 dark:text-gray-300">
-          Balances
+          Assets
         </h3>
         <button
           onClick={refresh}
@@ -155,13 +176,14 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
           ? Array.from({ length: Math.max(expectedCount, 2) }).map((_, i) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg h-[60px]"
+                className="flex items-center gap-3 p-3 rounded-lg border-l-4 border-l-gray-300 dark:border-l-gray-600 bg-white dark:bg-m-blue-dark-3 shadow-sm h-[68px]"
               >
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-12 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
-                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+                <div className="w-9 h-9 rounded-full bg-gray-200 dark:bg-gray-600 animate-pulse flex-shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
+                  <div className="h-3 w-12 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
                 </div>
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1.5">
                   <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
                   <div className="h-3 w-12 bg-gray-200 dark:bg-gray-600 rounded animate-pulse" />
                 </div>
@@ -175,17 +197,20 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
               <button
                 key={b.symbol}
                 onClick={() => setSelectedAsset(b)}
-                className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg h-[60px] text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                className={`w-full flex items-center gap-3 p-3 rounded-lg border-l-4 ${BORDER_COLORS[b.category]} bg-white dark:bg-m-blue-dark-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer text-left h-[68px]`}
               >
-                <div className="flex items-center gap-2">
-                  <div>
-                    <span className="font-bold text-sm">{b.symbol}</span>
-                    <span className="text-xs text-gray-400 ml-2">{b.name}</span>
-                  </div>
-                  <CategoryBadge category={b.category} />
+                <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[b.category]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                  {b.symbol[0]}
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-mono">{b.balance}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-sm">{b.symbol}</span>
+                    <span className="text-xs text-gray-400 truncate">{b.name}</span>
+                  </div>
+                  <span className="text-[10px] text-gray-400">{CATEGORY_LABELS[b.category]}</span>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-sm font-bold font-mono">{b.balance}</div>
                   <div className="text-xs text-gray-400">{b.usdValue}</div>
                 </div>
               </button>
@@ -249,11 +274,15 @@ function AssetDetailModal({
         className="bg-white dark:bg-m-blue-dark-2 rounded-xl w-full max-w-md shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-lg">{asset.symbol}</span>
-            <span className="text-sm text-gray-400">{asset.name}</span>
-            <CategoryBadge category={asset.category} />
+        <div className={`flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full ${AVATAR_COLORS[asset.category]} flex items-center justify-center text-white font-bold`}>
+              {asset.symbol[0]}
+            </div>
+            <div>
+              <span className="font-bold text-lg">{asset.symbol}</span>
+              <span className="text-sm text-gray-400 ml-2">{asset.name}</span>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -269,10 +298,7 @@ function AssetDetailModal({
             <span className="text-sm text-gray-400">{asset.usdValue}</span>
           </div>
 
-          <DetailRow
-            label="Network"
-            value={networkName}
-          />
+          <DetailRow label="Network" value={networkName} />
 
           <DetailRow
             label="Wallet Address"
@@ -292,11 +318,7 @@ function AssetDetailModal({
             />
           )}
 
-          <DetailRow
-            label="Derivation Path"
-            value={derivationPath}
-            mono
-          />
+          <DetailRow label="Derivation Path" value={derivationPath} mono />
 
           <a
             href={explorerLink}
@@ -340,26 +362,6 @@ function DetailRow({
         )}
       </div>
     </div>
-  );
-}
-
-function CategoryBadge({ category }: { category: AssetCategory }) {
-  const colors: Record<AssetCategory, string> = {
-    gas: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-    stablecoin: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-    defi: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
-    ecosystem: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  };
-  const labels: Record<AssetCategory, string> = {
-    gas: "Gas",
-    stablecoin: "Stable",
-    defi: "DeFi",
-    ecosystem: "Eco",
-  };
-  return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${colors[category]}`}>
-      {labels[category]}
-    </span>
   );
 }
 

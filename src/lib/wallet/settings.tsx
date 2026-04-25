@@ -10,6 +10,12 @@ import {
 } from "react";
 import { allNetworks, type TokenConfig } from "./networks";
 import { getAssetsForNetwork } from "./assets";
+import {
+  getDefaultSchemeId,
+  getScheme,
+  resolveTemplate,
+  getNextIndex,
+} from "./derivationSchemes";
 
 export type UiMode = "simple" | "advanced";
 export type PaymentAssetPref = "USDT" | "USDC" | "auto";
@@ -21,11 +27,19 @@ interface TokenSetting {
   visible: boolean;
 }
 
+export interface DerivedAccount {
+  path: string;
+  label: string;
+}
+
 interface NetworkSetting {
   added: boolean;
   visible: boolean;
   tokens: Record<string, TokenSetting>;
   derivationPath?: string;
+  accounts: DerivedAccount[];
+  activeAccountIndex: number;
+  schemeId?: string;
 }
 
 export interface CustomToken {
@@ -61,7 +75,18 @@ function buildDefaultSettings(): WalletSettings {
       tokens[t.symbol] = { added: isVisible, visible: isVisible };
     }
 
-    networks[key] = { added: net.isDefault, visible: true, tokens };
+    const schemeId = getDefaultSchemeId(net.chainType);
+    const scheme = getScheme(schemeId)!;
+    const defaultPath = resolveTemplate(scheme.template, 0);
+
+    networks[key] = {
+      added: net.isDefault,
+      visible: true,
+      tokens,
+      accounts: [{ path: defaultPath, label: "Account 1" }],
+      activeAccountIndex: 0,
+      schemeId,
+    };
   }
   return {
     networks,
@@ -91,11 +116,23 @@ function loadSettings(): WalletSettings {
       if (!stored.networks[key]) {
         stored.networks[key] = defaults.networks[key];
       } else {
+        const ns = stored.networks[key];
         for (const tkn of Object.keys(defaults.networks[key].tokens)) {
-          if (!stored.networks[key].tokens[tkn]) {
-            stored.networks[key].tokens[tkn] = defaults.networks[key].tokens[tkn];
+          if (!ns.tokens[tkn]) {
+            ns.tokens[tkn] = defaults.networks[key].tokens[tkn];
           }
         }
+        // Migrate: add accounts array if missing
+        if (!ns.accounts || ns.accounts.length === 0) {
+          const net = allNetworks[key];
+          const schemeId = ns.schemeId || getDefaultSchemeId(net.chainType);
+          const path = ns.derivationPath || resolveTemplate(getScheme(schemeId)!.template, 0);
+          ns.accounts = [{ path, label: "Account 1" }];
+          ns.activeAccountIndex = 0;
+          ns.schemeId = schemeId;
+        }
+        if (ns.activeAccountIndex == null) ns.activeAccountIndex = 0;
+        if (ns.activeAccountIndex >= ns.accounts.length) ns.activeAccountIndex = 0;
       }
     }
 
@@ -132,6 +169,10 @@ interface SettingsContextValue {
   addCustomToken: (token: CustomToken) => void;
   removeCustomToken: (networkKey: string, symbol: string) => void;
   setDerivationPath: (networkKey: string, path: string) => void;
+  addAccount: (networkKey: string, customPath?: string) => void;
+  removeAccount: (networkKey: string, index: number) => void;
+  setActiveAccount: (networkKey: string, index: number) => void;
+  setScheme: (networkKey: string, schemeId: string) => void;
   getActiveNetworkKeys: () => string[];
   getVisibleTokens: (networkKey: string) => string[];
   getDerivationPath: (networkKey: string) => string;
@@ -293,9 +334,81 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const setDerivationPath = useCallback(
     (networkKey: string, path: string) => {
       const next = structuredClone(settings);
-      if (next.networks[networkKey]) {
-        next.networks[networkKey].derivationPath = path;
+      const ns = next.networks[networkKey];
+      if (ns) {
+        ns.derivationPath = path;
+        if (ns.accounts.length > 0) {
+          ns.accounts[ns.activeAccountIndex].path = path;
+        }
       }
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const addAccount = useCallback(
+    (networkKey: string, customPath?: string) => {
+      const next = structuredClone(settings);
+      const ns = next.networks[networkKey];
+      if (!ns) return;
+      let path: string;
+      if (customPath) {
+        path = customPath;
+      } else {
+        const scheme = getScheme(ns.schemeId || "bip44-standard");
+        if (!scheme) return;
+        const existingPaths = ns.accounts.map((a) => a.path);
+        const nextIdx = getNextIndex(scheme.template, existingPaths);
+        path = resolveTemplate(scheme.template, nextIdx);
+      }
+      const label = `Account ${ns.accounts.length + 1}`;
+      ns.accounts.push({ path, label });
+      ns.activeAccountIndex = ns.accounts.length - 1;
+      ns.derivationPath = path;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const removeAccount = useCallback(
+    (networkKey: string, index: number) => {
+      const next = structuredClone(settings);
+      const ns = next.networks[networkKey];
+      if (!ns || ns.accounts.length <= 1 || index === 0) return;
+      ns.accounts.splice(index, 1);
+      if (ns.activeAccountIndex >= ns.accounts.length) {
+        ns.activeAccountIndex = ns.accounts.length - 1;
+      }
+      ns.derivationPath = ns.accounts[ns.activeAccountIndex].path;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setActiveAccount = useCallback(
+    (networkKey: string, index: number) => {
+      const next = structuredClone(settings);
+      const ns = next.networks[networkKey];
+      if (!ns || index >= ns.accounts.length) return;
+      ns.activeAccountIndex = index;
+      ns.derivationPath = ns.accounts[index].path;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setScheme = useCallback(
+    (networkKey: string, schemeId: string) => {
+      const next = structuredClone(settings);
+      const ns = next.networks[networkKey];
+      if (!ns) return;
+      const scheme = getScheme(schemeId);
+      if (!scheme) return;
+      ns.schemeId = schemeId;
+      const defaultPath = resolveTemplate(scheme.template, 0);
+      ns.accounts = [{ path: defaultPath, label: "Account 1" }];
+      ns.activeAccountIndex = 0;
+      ns.derivationPath = defaultPath;
       persist(next);
     },
     [settings, persist]
@@ -320,8 +433,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const getDerivationPath = useCallback(
     (networkKey: string) => {
-      const override = settings.networks[networkKey]?.derivationPath;
-      if (override) return override;
+      const ns = settings.networks[networkKey];
+      if (!ns) return allNetworks[networkKey]?.derivationPath ?? "m/44'/60'/0'/0/0";
+      const idx = ns.activeAccountIndex ?? 0;
+      if (ns.accounts && ns.accounts[idx]) return ns.accounts[idx].path;
+      if (ns.derivationPath) return ns.derivationPath;
       return allNetworks[networkKey]?.derivationPath ?? "m/44'/60'/0'/0/0";
     },
     [settings]
@@ -370,6 +486,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         addCustomToken,
         removeCustomToken,
         setDerivationPath,
+        addAccount,
+        removeAccount,
+        setActiveAccount,
+        setScheme,
         getActiveNetworkKeys,
         getVisibleTokens,
         getDerivationPath,

@@ -55,16 +55,18 @@ export default function WalletPage() {
   }, [activeKeys, networkKey]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
-  const derivationPath = useMemo(() => getDerivationPath(networkKey), [networkKey, getDerivationPath]);
+  const derivationPath = getDerivationPath(networkKey);
+  const accounts = settings.networks[networkKey]?.accounts ?? [];
+  const activeIdx = settings.networks[networkKey]?.activeAccountIndex ?? 0;
 
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveAccount(mnemonic, network.chainType);
+      return deriveAccount(mnemonic, network.chainType, derivationPath);
     } catch {
       return null;
     }
-  }, [mnemonic, network.chainType]);
+  }, [mnemonic, network.chainType, derivationPath]);
 
   useEffect(() => {
     if (addressQrRef.current && account) {
@@ -134,7 +136,14 @@ export default function WalletPage() {
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <canvas ref={addressQrRef} className="rounded flex-shrink-0" />
           <div className="flex-1 min-w-0 text-center sm:text-left">
-            <p className="text-xs text-gray-400 mb-1">{network.name}</p>
+            <div className="flex items-center gap-2 justify-center sm:justify-start mb-1">
+              <p className="text-xs text-gray-400">{network.name}</p>
+              {accounts.length > 1 && (
+                <span className="text-[10px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-bold">
+                  {accounts[activeIdx]?.label ?? `Account ${activeIdx + 1}`}
+                </span>
+              )}
+            </div>
             <p className="font-mono text-xs sm:text-sm break-all">{account.address}</p>
             <p className="text-[10px] text-gray-400 font-mono mt-1">{derivationPath}</p>
             <button

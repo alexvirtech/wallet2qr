@@ -5,20 +5,25 @@ import { base58 } from "@scure/base";
 import { mnemonicToSeedSync } from "@scure/bip39";
 import type { NetworkConfig, TokenConfig } from "./networks";
 
-// SLIP-0010 Ed25519 derivation: m/44'/501'/0'/0'
-const SOLANA_PATH = [
-  44 + 0x80000000,
-  501 + 0x80000000,
-  0 + 0x80000000,
-  0 + 0x80000000,
-];
+const DEFAULT_SOLANA_PATH = "m/44'/501'/0'/0'";
 
-function slip0010Derive(seed: Uint8Array): Uint8Array {
+function parsePath(path: string): number[] {
+  return path
+    .replace("m/", "")
+    .split("/")
+    .map((seg) => {
+      const hardened = seg.endsWith("'");
+      const idx = parseInt(seg.replace("'", ""), 10);
+      return hardened ? idx + 0x80000000 : idx;
+    });
+}
+
+function slip0010Derive(seed: Uint8Array, indices: number[]): Uint8Array {
   let I = hmac(sha512, "ed25519 seed", seed);
   let il = I.slice(0, 32);
   let ir = I.slice(32);
 
-  for (const index of SOLANA_PATH) {
+  for (const index of indices) {
     const data = new Uint8Array(37);
     data[0] = 0x00;
     data.set(il, 1);
@@ -34,9 +39,10 @@ function slip0010Derive(seed: Uint8Array): Uint8Array {
   return il;
 }
 
-export function deriveSolanaAccount(mnemonic: string) {
+export function deriveSolanaAccount(mnemonic: string, path?: string) {
   const seed = mnemonicToSeedSync(mnemonic.trim().toLowerCase());
-  const privateKey = slip0010Derive(seed);
+  const indices = parsePath(path || DEFAULT_SOLANA_PATH);
+  const privateKey = slip0010Derive(seed, indices);
   const publicKey = ed25519.getPublicKey(privateKey);
   const address = base58.encode(publicKey);
 

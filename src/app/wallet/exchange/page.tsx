@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveAccount } from "@/lib/wallet/derive";
@@ -12,7 +13,7 @@ import type { Hex, Address } from "viem";
 
 export default function ExchangePage() {
   const { mnemonic, isUnlocked } = useSession();
-  const { getActiveNetworkKeys } = useSettings();
+  const { getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
   const activeKeys = getActiveNetworkKeys().filter(
     (k) => getNetwork(k).chainType !== "bitcoin"
@@ -24,31 +25,31 @@ export default function ExchangePage() {
   }, [isUnlocked, router]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+  const derivationPath = getDerivationPath(networkKey);
 
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveAccount(mnemonic, network.chainType);
+      return deriveAccount(mnemonic, network.chainType, derivationPath);
     } catch {
       return null;
     }
-  }, [mnemonic, network.chainType]);
+  }, [mnemonic, network.chainType, derivationPath]);
 
   if (!isUnlocked || !account) return null;
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/wallet")}
-            className="text-blue-500 hover:text-blue-700 text-sm"
-          >
-            &larr; Back
-          </button>
-          <h1 className="text-2xl font-bold">Exchange</h1>
+      <div className="mb-6">
+        <div className="text-xs text-gray-400 mb-1">
+          <Link href="/wallet" className="hover:text-blue-500 transition-colors">Wallet</Link>
+          <span className="mx-1">/</span>
+          <span>Exchange</span>
         </div>
-        <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Exchange</h1>
+          <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+        </div>
       </div>
 
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
