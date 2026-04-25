@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { parseUnits, type Address, type Hex } from "viem";
 import { allNetworks, allNetworkKeys } from "@/lib/wallet/networks";
+import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
+import { fetchPrices } from "@/lib/wallet/prices";
 import { useSettings } from "@/lib/wallet/settings";
 import { initLifi } from "@/lib/lifi/client";
 import { fetchQuote } from "@/lib/lifi/quote";
@@ -64,6 +66,8 @@ export default function ExchangeForm({
   const [error, setError] = useState<string | null>(null);
   const [executing, setExecuting] = useState(false);
   const [txStatus, setTxStatus] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [prices, setPrices] = useState<Record<string, number>>({});
 
   useEffect(() => {
     initLifi();
@@ -83,6 +87,37 @@ export default function ExchangeForm({
       setToToken(toTokens[0].address);
     }
   }, [toChain, toTokens, toToken]);
+
+  const selectedFromToken = fromTokens.find(t => t.address === fromToken);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBalance(null);
+    const net = allNetworks[fromChain];
+    if (!net || net.chainType !== "evm") return;
+    const tokens = getAllTokens(fromChain);
+    const info = tokens.find(t => t.address === fromToken);
+    if (!info) return;
+    (async () => {
+      try {
+        const result = fromToken === NATIVE_ADDRESS
+          ? await getNativeBalance(net, address)
+          : await getTokenBalance(net, fromToken as Address, address, info.decimals);
+        if (!cancelled) setBalance(result.formatted);
+      } catch { if (!cancelled) setBalance(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [fromChain, fromToken, address]);
+
+  useEffect(() => { fetchPrices().then(setPrices); }, []);
+
+  const usdEstimate = useMemo(() => {
+    const amt = parseFloat(amount);
+    const price = prices[selectedFromToken?.symbol ?? ""];
+    if (!amt || !price) return null;
+    const val = amt * price;
+    return val >= 0.01 ? val.toFixed(2) : val.toPrecision(2);
+  }, [amount, prices, selectedFromToken?.symbol]);
 
   const handleQuote = useCallback(async () => {
     setError(null);
@@ -227,20 +262,36 @@ export default function ExchangeForm({
       </div>
 
       <div>
-        <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-          Amount
-        </label>
-        <input
-          type="number"
-          step="any"
-          value={amount}
-          onChange={(e) => {
-            setAmount(e.target.value);
-            setQuoteResult(null);
-          }}
-          placeholder="0.0"
-          className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 font-mono text-sm"
-        />
+        <div className="flex justify-between items-center">
+          <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
+            Amount
+          </label>
+          {balance !== null && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Available: <span className="font-mono">{parseFloat(balance).toFixed(6)}</span>{" "}
+              <button type="button" onClick={() => { setAmount(parseFloat(balance).toString()); setQuoteResult(null); }} className="text-blue-500 hover:text-blue-700 font-bold ml-1">Max</button>
+            </span>
+          )}
+        </div>
+        <div className="mt-1 flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/40">
+          <input
+            type="number"
+            step="any"
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setQuoteResult(null);
+            }}
+            placeholder="0.0"
+            className="flex-1 px-3 py-2.5 dark:bg-gray-700 dark:text-gray-300 font-mono text-sm focus:outline-none min-w-0 border-none"
+          />
+          <span className="px-3 py-2.5 bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-sm font-bold border-l border-gray-300 dark:border-gray-600">
+            {selectedFromToken?.symbol ?? ""}
+          </span>
+        </div>
+        {usdEstimate && (
+          <p className="text-xs text-gray-400 mt-1">~${usdEstimate}</p>
+        )}
       </div>
 
       {quoteResult && (

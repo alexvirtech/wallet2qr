@@ -66,6 +66,7 @@ export interface ThorQuoteResponse {
   outbound_delay_blocks: number;
   outbound_delay_seconds: number;
   total_swap_seconds: number;
+  router?: string;
   dust_threshold: string;
   recommended_min_amount_in: string;
   recommended_gas_rate: string;

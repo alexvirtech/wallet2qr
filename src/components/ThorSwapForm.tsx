@@ -1,7 +1,22 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import {
+  createWalletClient,
+  http,
+  parseUnits,
+  stringToHex,
+  erc20Abi,
+  type Address,
+  type Hex,
+  type Chain,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { mainnet, avalanche, bsc } from "viem/chains";
 import { allNetworks } from "@/lib/wallet/networks";
+import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
+import { getBtcBalance } from "@/lib/wallet/bitcoin";
+import { fetchPrices } from "@/lib/wallet/prices";
 import {
   fetchThorQuote,
   getThorAsset,
@@ -15,6 +30,7 @@ import {
 
 interface ThorSwapFormProps {
   addresses: Record<string, string>;
+  privateKeys: Record<string, string>;
 }
 
 interface TokenOption {
@@ -36,7 +52,29 @@ function getTokensForNetwork(networkKey: string): TokenOption[] {
   return list;
 }
 
-export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
+const EVM_CHAINS: Record<number, Chain> = {
+  [mainnet.id]: mainnet,
+  [avalanche.id]: avalanche,
+  [bsc.id]: bsc,
+};
+
+const THOR_ROUTER_ABI = [
+  {
+    inputs: [
+      { name: "vault", type: "address" },
+      { name: "asset", type: "address" },
+      { name: "amount", type: "uint256" },
+      { name: "memo", type: "string" },
+      { name: "expiry", type: "uint256" },
+    ],
+    name: "depositWithExpiry",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+] as const;
+
+export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormProps) {
   const supportedKeys = getThorSupportedNetworks();
 
   const [fromChain, setFromChain] = useState(supportedKeys.includes("bitcoin") ? "bitcoin" : supportedKeys[0]);
@@ -48,6 +86,10 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [executing, setExecuting] = useState(false);
+  const [txHash, setTxHash] = useState<string | null>(null);
 
   const fromTokens = useMemo(() => getTokensForNetwork(fromChain), [fromChain]);
   const toTokens = useMemo(() => getTokensForNetwork(toChain), [toChain]);
@@ -55,9 +97,47 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
   const fromToken = fromTokens[fromTokenIdx] ?? fromTokens[0];
   const toToken = toTokens[toTokenIdx] ?? toTokens[0];
 
+  const isEvmSource = allNetworks[fromChain]?.chainType === "evm";
+
+  useEffect(() => {
+    let cancelled = false;
+    setBalance(null);
+    const net = allNetworks[fromChain];
+    const addr = addresses[fromChain];
+    if (!net || !addr) return;
+    (async () => {
+      try {
+        let result;
+        if (net.chainType === "bitcoin") {
+          result = await getBtcBalance(addr);
+        } else if (net.chainType === "evm") {
+          const tokens = getTokensForNetwork(fromChain);
+          const info = tokens[fromTokenIdx] ?? tokens[0];
+          if (!info) return;
+          result = info.address
+            ? await getTokenBalance(net, info.address as Address, addr as Address, info.decimals)
+            : await getNativeBalance(net, addr as Address);
+        }
+        if (!cancelled && result) setBalance(result.formatted);
+      } catch { if (!cancelled) setBalance(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [fromChain, fromTokenIdx, addresses]);
+
+  useEffect(() => { fetchPrices().then(setPrices); }, []);
+
+  const usdEstimate = useMemo(() => {
+    const amt = parseFloat(amount);
+    const price = prices[fromToken?.symbol ?? ""];
+    if (!amt || !price) return null;
+    const val = amt * price;
+    return val >= 0.01 ? val.toFixed(2) : val.toPrecision(2);
+  }, [amount, prices, fromToken?.symbol]);
+
   const handleQuote = useCallback(async () => {
     setError(null);
     setQuote(null);
+    setTxHash(null);
     if (!amount || parseFloat(amount) <= 0) {
       setError("Enter a valid amount");
       return;
@@ -95,6 +175,66 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
     }
   }, [fromChain, toChain, fromToken, toToken, amount, addresses]);
 
+  const handleExecute = useCallback(async () => {
+    if (!quote || !isEvmSource) return;
+    const net = allNetworks[fromChain];
+    const pk = privateKeys[fromChain];
+    if (!net || !pk) return;
+
+    setExecuting(true);
+    setError(null);
+    setTxHash(null);
+    try {
+      const chain = EVM_CHAINS[net.chainId] ?? {
+        id: net.chainId,
+        name: net.name,
+        nativeCurrency: net.nativeCurrency,
+        rpcUrls: { default: { http: [net.rpcUrl] } },
+      };
+      const account = privateKeyToAccount(pk as Hex);
+      const client = createWalletClient({ account, chain, transport: http(net.rpcUrl) });
+      const tokenAmount = parseUnits(amount, fromToken.decimals);
+
+      let hash: Hex;
+      if (!fromToken.address) {
+        hash = await client.sendTransaction({
+          to: quote.inbound_address as Address,
+          value: tokenAmount,
+          data: stringToHex(quote.memo),
+          chain,
+        });
+      } else {
+        const router = quote.router as Address;
+        if (!router) throw new Error("No router address in quote — cannot execute ERC20 swap");
+        await client.writeContract({
+          address: fromToken.address as Address,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [router, tokenAmount],
+          chain,
+        });
+        hash = await client.writeContract({
+          address: router,
+          abi: THOR_ROUTER_ABI,
+          functionName: "depositWithExpiry",
+          args: [
+            quote.inbound_address as Address,
+            fromToken.address as Address,
+            tokenAmount,
+            quote.memo,
+            BigInt(quote.expiry),
+          ],
+          chain,
+        });
+      }
+      setTxHash(hash);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Transaction failed");
+    } finally {
+      setExecuting(false);
+    }
+  }, [quote, isEvmSource, fromChain, privateKeys, amount, fromToken]);
+
   const copyText = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
@@ -114,7 +254,7 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
           </label>
           <select
             value={fromChain}
-            onChange={(e) => { setFromChain(e.target.value); setFromTokenIdx(0); setQuote(null); }}
+            onChange={(e) => { setFromChain(e.target.value); setFromTokenIdx(0); setQuote(null); setTxHash(null); }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
             {supportedKeys.map((k) => (
@@ -123,7 +263,7 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
           </select>
           <select
             value={fromTokenIdx}
-            onChange={(e) => { setFromTokenIdx(Number(e.target.value)); setQuote(null); }}
+            onChange={(e) => { setFromTokenIdx(Number(e.target.value)); setQuote(null); setTxHash(null); }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
             {fromTokens.map((t, i) => (
@@ -137,7 +277,7 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
           </label>
           <select
             value={toChain}
-            onChange={(e) => { setToChain(e.target.value); setToTokenIdx(0); setQuote(null); }}
+            onChange={(e) => { setToChain(e.target.value); setToTokenIdx(0); setQuote(null); setTxHash(null); }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
             {supportedKeys.map((k) => (
@@ -146,7 +286,7 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
           </select>
           <select
             value={toTokenIdx}
-            onChange={(e) => { setToTokenIdx(Number(e.target.value)); setQuote(null); }}
+            onChange={(e) => { setToTokenIdx(Number(e.target.value)); setQuote(null); setTxHash(null); }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
             {toTokens.map((t, i) => (
@@ -157,15 +297,23 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
       </div>
 
       <div>
-        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          Amount
-        </label>
+        <div className="flex justify-between items-center">
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Amount
+          </label>
+          {balance !== null && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Available: <span className="font-mono">{parseFloat(balance).toFixed(6)}</span>{" "}
+              <button type="button" onClick={() => { setAmount(parseFloat(balance).toString()); setQuote(null); setTxHash(null); }} className="text-blue-500 hover:text-blue-700 font-bold ml-1">Max</button>
+            </span>
+          )}
+        </div>
         <div className="mt-1 flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/40">
           <input
             type="number"
             step="any"
             value={amount}
-            onChange={(e) => { setAmount(e.target.value); setQuote(null); }}
+            onChange={(e) => { setAmount(e.target.value); setQuote(null); setTxHash(null); }}
             placeholder="0.0"
             className="flex-1 px-3 py-2.5 dark:bg-m-blue-dark-2 dark:text-gray-200 font-mono text-sm focus:outline-none min-w-0 border-none"
           />
@@ -173,6 +321,9 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
             {fromToken.symbol}
           </span>
         </div>
+        {usdEstimate && (
+          <p className="text-xs text-gray-400 mt-1">~${usdEstimate}</p>
+        )}
       </div>
 
       {quote && (
@@ -200,46 +351,72 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
             </div>
           )}
 
-          <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3 space-y-3">
-            <p className="text-xs font-bold text-gray-600 dark:text-gray-300">
-              Send {amount} {fromToken.symbol} to this address:
-            </p>
-            <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-mono text-xs break-all">{quote.inbound_address}</p>
-                <button
-                  onClick={() => copyText(quote.inbound_address, "addr")}
-                  className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
-                >
-                  {copiedField === "addr" ? "Copied" : "Copy"}
-                </button>
+          {txHash && (
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded p-3">
+                <p className="text-sm font-bold text-green-700 dark:text-green-300 mb-1">Transaction sent!</p>
+                <p className="font-mono text-xs break-all text-green-600 dark:text-green-400">{txHash}</p>
               </div>
             </div>
+          )}
 
-            <div>
-              <p className="text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">
-                With memo:
+          {isEvmSource && !txHash && (
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+              <button
+                onClick={handleExecute}
+                disabled={executing}
+                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {executing ? "Executing Swap..." : "Execute Swap"}
+              </button>
+              <p className="text-[10px] text-gray-400 mt-2 text-center">
+                Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}
+              </p>
+            </div>
+          )}
+
+          {!isEvmSource && (
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3 space-y-3">
+              <p className="text-xs font-bold text-gray-600 dark:text-gray-300">
+                Send {amount} {fromToken.symbol} to this address:
               </p>
               <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-xs break-all">{quote.memo}</p>
+                  <p className="font-mono text-xs break-all">{quote.inbound_address}</p>
                   <button
-                    onClick={() => copyText(quote.memo, "memo")}
+                    onClick={() => copyText(quote.inbound_address, "addr")}
                     className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
                   >
-                    {copiedField === "memo" ? "Copied" : "Copy"}
+                    {copiedField === "addr" ? "Copied" : "Copy"}
                   </button>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded p-2">
-              <p className="text-[10px] text-yellow-700 dark:text-yellow-300">
-                The memo is required for the swap to be processed. Send from a wallet that supports OP_RETURN (BTC) or
-                transaction memos. Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}.
-              </p>
+              <div>
+                <p className="text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">
+                  With memo:
+                </p>
+                <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-xs break-all">{quote.memo}</p>
+                    <button
+                      onClick={() => copyText(quote.memo, "memo")}
+                      className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
+                    >
+                      {copiedField === "memo" ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded p-2">
+                <p className="text-[10px] text-yellow-700 dark:text-yellow-300">
+                  The memo is required for the swap to be processed. Send from a wallet that supports OP_RETURN (BTC) or
+                  transaction memos. Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -256,7 +433,7 @@ export default function ThorSwapForm({ addresses }: ThorSwapFormProps) {
       )}
       {quote && (
         <button
-          onClick={() => setQuote(null)}
+          onClick={() => { setQuote(null); setTxHash(null); }}
           className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold py-2.5 px-6 rounded-lg text-sm transition-colors"
         >
           New Quote

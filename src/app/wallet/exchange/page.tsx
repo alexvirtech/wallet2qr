@@ -42,18 +42,21 @@ export default function ExchangePage() {
     }
   }, [mnemonic, network.chainType, derivationPath]);
 
-  const thorAddresses = useMemo(() => {
-    if (!mnemonic) return {};
-    const result: Record<string, string> = {};
+  const thorData = useMemo(() => {
+    if (!mnemonic) return { addresses: {} as Record<string, string>, privateKeys: {} as Record<string, string> };
+    const addresses: Record<string, string> = {};
+    const privateKeys: Record<string, string> = {};
     for (const key of getThorSupportedNetworks()) {
       const net = allNetworks[key];
       if (!net) continue;
       try {
         const path = getDerivationPath(key);
-        result[key] = deriveAccount(mnemonic, net.chainType, path).address;
+        const acc = deriveAccount(mnemonic, net.chainType, path);
+        addresses[key] = acc.address;
+        privateKeys[key] = acc.privateKey;
       } catch {}
     }
-    return result;
+    return { addresses, privateKeys };
   }, [mnemonic, getDerivationPath]);
 
   if (!isUnlocked || !account) return null;
@@ -115,7 +118,7 @@ export default function ExchangePage() {
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Cross-chain swaps via THORChain. Supports Bitcoin, Ethereum, BNB Chain, and Avalanche.
           </p>
-          <ThorSwapForm addresses={thorAddresses} />
+          <ThorSwapForm addresses={thorData.addresses} privateKeys={thorData.privateKeys} />
         </>
       )}
     </div>
