@@ -52,6 +52,14 @@ function getTokensForNetwork(networkKey: string): TokenOption[] {
   return list;
 }
 
+function logSwap(data: Record<string, unknown>) {
+  fetch("/api/admin/log-swap", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
 const EVM_CHAINS: Record<number, Chain> = {
   [mainnet.id]: mainnet,
   [avalanche.id]: avalanche,
@@ -228,12 +236,25 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
         });
       }
       setTxHash(hash);
+      logSwap({
+        provider: "thorchain",
+        fromChain,
+        toChain,
+        fromToken: fromToken.symbol,
+        toToken: toToken.symbol,
+        fromAmount: amount,
+        toAmount: quote.expected_amount_out ? thorAmountToHuman(quote.expected_amount_out, toToken.decimals) : "",
+        txHash: hash,
+        status: "pending",
+        feeBps: Number(THORCHAIN_AFFILIATE_BPS),
+        feeAmount: quote.fees?.total ? thorAmountToHuman(quote.fees.total, toToken.decimals) : "",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Transaction failed");
     } finally {
       setExecuting(false);
     }
-  }, [quote, isEvmSource, fromChain, privateKeys, amount, fromToken]);
+  }, [quote, isEvmSource, fromChain, toChain, privateKeys, amount, fromToken, toToken]);
 
   const copyText = (text: string, field: string) => {
     navigator.clipboard.writeText(text);

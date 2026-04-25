@@ -142,6 +142,7 @@ function loadSettings(): WalletSettings {
       }
     }
 
+    saveSettings(stored);
     return stored;
   } catch {
     return buildDefaultSettings();

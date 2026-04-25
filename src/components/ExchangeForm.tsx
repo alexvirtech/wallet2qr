@@ -16,6 +16,14 @@ interface ExchangeFormProps {
   currentNetwork: string;
 }
 
+function logSwap(data: Record<string, unknown>) {
+  fetch("/api/admin/log-swap", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  }).catch(() => {});
+}
+
 const NATIVE_ADDRESS = "0x0000000000000000000000000000000000000000";
 const SOL_NATIVE = "So11111111111111111111111111111111111111112";
 
@@ -167,6 +175,19 @@ export default function ExchangeForm({
         }
       );
       setTxStatus("Swap completed!");
+      logSwap({
+        provider: "lifi",
+        fromChain,
+        toChain,
+        fromToken: selectedFromToken?.symbol ?? "",
+        toToken: toTokens.find(t => t.address === toToken)?.symbol ?? "",
+        fromAmount: amount,
+        toAmount: quoteResult.step.estimate?.toAmountMin
+          ? (Number(quoteResult.step.estimate.toAmountMin) / 10 ** (quoteResult.step.action?.toToken?.decimals ?? 18)).toFixed(6)
+          : "",
+        txHash: "",
+        status: "completed",
+      });
       setQuoteResult(null);
       setAmount("");
     } catch (e) {
@@ -175,7 +196,7 @@ export default function ExchangeForm({
     } finally {
       setExecuting(false);
     }
-  }, [quoteResult, privateKey, fromChain]);
+  }, [quoteResult, privateKey, fromChain, selectedFromToken, toTokens, toToken, toChain, amount]);
 
   return (
     <div className="space-y-4">
