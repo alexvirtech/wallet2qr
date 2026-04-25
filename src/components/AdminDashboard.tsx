@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { ThorSwapRow } from "@/app/admin/page";
-import type { SwapLogEntry } from "@/lib/admin/swapLog";
+import type { ThorSwapRow, LifiSwapRow } from "@/app/admin/page";
 
 interface Props {
   thorSwaps: ThorSwapRow[];
-  lifiSwaps: SwapLogEntry[];
+  lifiSwaps: LifiSwapRow[];
 }
 
 function formatDate(ts: number) {
@@ -33,7 +32,7 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
   const thorAvgFee = thorCount > 0 ? (thorFeeTotal / thorCount).toFixed(0) : "0";
 
   const lifiCount = lifiSwaps.length;
-  const lifiFeeSwaps = lifiSwaps.filter((s) => s.feeBps);
+  const lifiTotalUsd = lifiSwaps.reduce((sum, s) => sum + parseFloat(s.fromAmountUsd || "0"), 0);
 
   return (
     <div className="space-y-6">
@@ -42,8 +41,8 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
         <StatCard label="Avg Affiliate Fee" value={`${thorAvgFee} bps`} />
         <StatCard label="LI.FI Swaps" value={String(lifiCount)} />
         <StatCard
-          label="LI.FI Fee Swaps"
-          value={String(lifiFeeSwaps.length)}
+          label="LI.FI Volume"
+          value={`$${lifiTotalUsd.toFixed(2)}`}
         />
       </div>
 
@@ -140,14 +139,9 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
       {tab === "lifi" && (
         <div className="overflow-x-auto">
           {lifiCount === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-sm text-gray-500">
-                No LI.FI swaps recorded yet.
-              </p>
-              <p className="text-xs text-gray-400 mt-2">
-                Swap logging requires <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">BLOB_READ_WRITE_TOKEN</code> environment variable.
-              </p>
-            </div>
+            <p className="text-sm text-gray-500 py-8 text-center">
+              No LI.FI swaps yet.
+            </p>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -156,23 +150,24 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2 pr-4">From</th>
                   <th className="py-2 pr-4">To</th>
+                  <th className="py-2 pr-4">Tool</th>
                   <th className="py-2 pr-4">Fee</th>
                   <th className="py-2">Tx</th>
                 </tr>
               </thead>
               <tbody>
-                {lifiSwaps.map((s) => (
+                {lifiSwaps.map((s, i) => (
                   <tr
-                    key={s.id}
+                    key={i}
                     className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
                   >
-                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(s.timestamp)}</td>
+                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(s.date)}</td>
                     <td className="py-2 pr-4">
                       <span
                         className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                          s.status === "completed"
+                          s.status === "DONE"
                             ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : s.status === "failed"
+                            : s.status === "FAILED"
                               ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                               : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
                         }`}
@@ -181,17 +176,28 @@ export default function AdminDashboard({ thorSwaps, lifiSwaps }: Props) {
                       </span>
                     </td>
                     <td className="py-2 pr-4 font-mono text-xs">
-                      {s.fromAmount} {s.fromToken} ({s.fromChain})
+                      {s.fromAmount} {s.fromToken}
+                      <span className="text-gray-400 ml-1">(${parseFloat(s.fromAmountUsd).toFixed(2)})</span>
                     </td>
                     <td className="py-2 pr-4 font-mono text-xs">
-                      {s.toAmount} {s.toToken} ({s.toChain})
+                      {s.toAmount} {s.toToken}
+                      <span className="text-gray-400 ml-1">(${parseFloat(s.toAmountUsd).toFixed(2)})</span>
                     </td>
-                    <td className="py-2 pr-4">
-                      {s.feeBps ? `${s.feeBps} bps` : "—"}
-                      {s.feeAmount && <span className="text-gray-400 ml-1">({s.feeAmount})</span>}
-                    </td>
+                    <td className="py-2 pr-4 text-xs">{s.tool}</td>
+                    <td className="py-2 pr-4 text-xs">{s.feeAmountUsd}</td>
                     <td className="py-2 font-mono text-xs">
-                      {shortenHash(s.txHash)}
+                      {s.txLink ? (
+                        <a
+                          href={s.txLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:text-blue-700"
+                        >
+                          {shortenHash(s.txHash)}
+                        </a>
+                      ) : (
+                        shortenHash(s.txHash)
+                      )}
                     </td>
                   </tr>
                 ))}
