@@ -21,8 +21,9 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Allow /admin on main domain too (auth is enforced by the layout)
   if (path.startsWith("/admin")) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.next();
   }
 
   return NextResponse.next();
