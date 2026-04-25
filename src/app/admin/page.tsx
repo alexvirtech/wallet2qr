@@ -52,10 +52,11 @@ function parseMidgard(actions: MidgardAction[]): ThorSwapRow[] {
 }
 
 async function fetchThorchainSwaps(): Promise<ThorSwapRow[]> {
-  const affiliate = process.env.NEXT_PUBLIC_THOR_AFFILIATE;
+  const affiliate =
+    process.env.THOR_AFFILIATE || process.env.NEXT_PUBLIC_THOR_AFFILIATE;
   if (!affiliate) return [];
   try {
-    const url = `https://midgard.ninerealms.com/v2/actions?address=${affiliate}&type=swap&limit=100`;
+    const url = `https://gateway.liquify.com/chain/thorchain_midgard/v2/actions?address=${affiliate}&type=swap&limit=100`;
     const res = await fetch(url, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();

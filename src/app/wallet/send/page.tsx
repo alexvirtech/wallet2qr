@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
-import { deriveEvmAccount } from "@/lib/wallet/derive";
+import { deriveAccount } from "@/lib/wallet/derive";
 import { getNetwork } from "@/lib/wallet/networks";
 import { getBestRoute, getRouteSummaryText } from "@/lib/wallet/routing";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import SendForm from "@/components/SendForm";
+import BtcSendForm from "@/components/BtcSendForm";
 import type { Hex } from "viem";
 
 export default function SendPage() {
@@ -17,7 +18,10 @@ export default function SendPage() {
   const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
   const activeKeys = getActiveNetworkKeys().filter(
-    (k) => getNetwork(k).chainType === "evm"
+    (k) => {
+      const ct = getNetwork(k).chainType;
+      return ct === "evm" || ct === "bitcoin";
+    }
   );
   const [networkKey, setNetworkKey] = useState(activeKeys[0] ?? "arbitrum");
   const [txHash, setTxHash] = useState<string | null>(null);
@@ -32,17 +36,19 @@ export default function SendPage() {
   const account = useMemo(() => {
     if (!mnemonic) return null;
     try {
-      return deriveEvmAccount(mnemonic, derivationPath);
+      return deriveAccount(mnemonic, getNetwork(networkKey).chainType, derivationPath);
     } catch {
       return null;
     }
-  }, [mnemonic, derivationPath]);
+  }, [mnemonic, networkKey, derivationPath]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+  const isBtc = network.chainType === "bitcoin";
 
+  const evmKeys = activeKeys.filter((k) => getNetwork(k).chainType === "evm");
   const bestRoute = useMemo(
-    () => getBestRoute(activeKeys, settings.routingMode, 50),
-    [activeKeys, settings.routingMode]
+    () => getBestRoute(evmKeys, settings.routingMode, 50),
+    [evmKeys, settings.routingMode]
   );
 
   if (!isUnlocked || !account) return null;
@@ -57,11 +63,11 @@ export default function SendPage() {
         </div>
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Send</h1>
-          <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
+          <NetworkSwitcher current={networkKey} onChange={(k) => { setNetworkKey(k); setTxHash(null); }} />
         </div>
       </div>
 
-      {isSimple && bestRoute && (
+      {!isBtc && isSimple && bestRoute && (
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
           <p className="text-sm text-blue-700 dark:text-blue-300">
             {getRouteSummaryText(bestRoute)}
@@ -97,10 +103,16 @@ export default function SendPage() {
             Back to Wallet
           </button>
         </div>
+      ) : isBtc ? (
+        <BtcSendForm
+          address={account.address}
+          privateKey={account.privateKey}
+          onSuccess={setTxHash}
+        />
       ) : (
         <SendForm
           network={network}
-          address={account.address}
+          address={account.address as `0x${string}`}
           privateKey={account.privateKey as Hex}
           onSuccess={setTxHash}
         />
