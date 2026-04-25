@@ -6,10 +6,10 @@ import { bech32 } from "@scure/base";
 
 const BTC_PATH = "m/84'/0'/0'/0/0";
 
-export function deriveBitcoinAccount(mnemonic: string) {
+export function deriveBitcoinAccount(mnemonic: string, path?: string) {
   const seed = mnemonicToSeedSync(mnemonic.trim().toLowerCase());
   const hd = HDKey.fromMasterSeed(seed);
-  const child = hd.derive(BTC_PATH);
+  const child = hd.derive(path || BTC_PATH);
 
   if (!child.publicKey) throw new Error("Failed to derive Bitcoin public key");
 

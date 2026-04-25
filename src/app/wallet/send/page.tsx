@@ -47,17 +47,17 @@ export default function SendPage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/wallet")}
-            className="text-blue-500 hover:text-blue-700 text-sm"
-          >
-            &larr; Back
-          </button>
+      <div className="mb-6">
+        <button
+          onClick={() => router.push("/wallet")}
+          className="text-blue-500 hover:text-blue-700 text-sm mb-3 inline-block"
+        >
+          &larr; Back to Wallet
+        </button>
+        <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Send</h1>
+          <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
         </div>
-        <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
       </div>
 
       {isSimple && bestRoute && (
@@ -91,7 +91,7 @@ export default function SendPage() {
           </div>
           <button
             onClick={() => router.push("/wallet")}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm"
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg text-sm"
           >
             Back to Wallet
           </button>

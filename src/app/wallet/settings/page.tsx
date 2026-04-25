@@ -4,10 +4,10 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
-import type { UiMode, PaymentAssetPref, PaymentNetworkPref, RoutingMode } from "@/lib/wallet/settings";
+import type { UiMode, PaymentAssetPref, PaymentNetworkPref, RoutingMode, CustomToken } from "@/lib/wallet/settings";
 import { allNetworks, allNetworkKeys } from "@/lib/wallet/networks";
 import { getAssetsForNetwork } from "@/lib/wallet/assets";
-import { deriveAccount } from "@/lib/wallet/derive";
+import { deriveAccount, incrementDerivationPath } from "@/lib/wallet/derive";
 import { buildQrUrl } from "@/lib/compat/qrPayload";
 import PasswordModal from "@/components/PasswordModal";
 import QrCanvas from "@/components/QrCanvas";
@@ -36,28 +36,46 @@ export default function SettingsPage() {
     addToken,
     removeToken,
     toggleTokenVisible,
+    addCustomToken,
+    removeCustomToken,
+    setDerivationPath,
+    getDerivationPath,
+    getCustomTokensForNetwork,
   } = useSettings();
 
   const [tab, setTab] = useState<Tab>("payment");
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [modalAction, setModalAction] = useState<ModalAction | null>(null);
+  const [expandedNets, setExpandedNets] = useState<Record<string, boolean>>({});
+  const [addTokenNet, setAddTokenNet] = useState<string | null>(null);
+  const [customAddr, setCustomAddr] = useState("");
+  const [customSymbol, setCustomSymbol] = useState("");
+  const [customName, setCustomName] = useState("");
+  const [customDecimals, setCustomDecimals] = useState("18");
+  const [editPathNet, setEditPathNet] = useState<string | null>(null);
+  const [editPathValue, setEditPathValue] = useState("");
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
   }, [isUnlocked, router]);
+
+  const toggleExpanded = useCallback((key: string) => {
+    setExpandedNets((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   const addresses = useMemo(() => {
     if (!mnemonic) return {};
     const result: Record<string, string> = {};
     for (const [key, net] of Object.entries(allNetworks)) {
       try {
-        result[key] = deriveAccount(mnemonic, net.chainType).address;
+        const path = settings.networks[key]?.derivationPath;
+        result[key] = deriveAccount(mnemonic, net.chainType, path).address;
       } catch {
         result[key] = "—";
       }
     }
     return result;
-  }, [mnemonic]);
+  }, [mnemonic, settings]);
 
   const qrData = useMemo(() => {
     if (!showMnemonic || !mnemonic || !password) return null;
@@ -85,6 +103,40 @@ export default function SettingsPage() {
     }
     setModalAction(null);
   }, [modalAction, addNetwork, removeNetwork, addToken, removeToken]);
+
+  const handleAddCustomToken = useCallback(() => {
+    if (!addTokenNet || !customSymbol.trim() || !customAddr.trim()) return;
+    const token: CustomToken = {
+      symbol: customSymbol.trim().toUpperCase(),
+      name: customName.trim() || customSymbol.trim().toUpperCase(),
+      address: customAddr.trim(),
+      decimals: parseInt(customDecimals, 10) || 18,
+      coingeckoId: "",
+      networkKey: addTokenNet,
+    };
+    addCustomToken(token);
+    setCustomAddr("");
+    setCustomSymbol("");
+    setCustomName("");
+    setCustomDecimals("18");
+    setAddTokenNet(null);
+  }, [addTokenNet, customSymbol, customAddr, customName, customDecimals, addCustomToken]);
+
+  const handleSavePath = useCallback(() => {
+    if (!editPathNet || !editPathValue.trim()) return;
+    setDerivationPath(editPathNet, editPathValue.trim());
+    setEditPathNet(null);
+    setEditPathValue("");
+  }, [editPathNet, editPathValue, setDerivationPath]);
+
+  const handleAutoIncrement = useCallback(
+    (key: string) => {
+      const current = getDerivationPath(key);
+      const next = incrementDerivationPath(current);
+      setDerivationPath(key, next);
+    },
+    [getDerivationPath, setDerivationPath]
+  );
 
   const activeKeys = allNetworkKeys.filter((k) => settings.networks[k]?.added);
   const availableKeys = allNetworkKeys.filter(
@@ -158,7 +210,6 @@ export default function SettingsPage() {
       {tab === "payment" && (
         <section className="space-y-6">
           <h2 className="text-lg font-bold">Payment Defaults</h2>
-
           <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4 space-y-4">
             <div>
               <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
@@ -173,11 +224,7 @@ export default function SettingsPage() {
                 <option value="USDT">USDT</option>
                 <option value="USDC">USDC</option>
               </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Used for payments and transfers by default.
-              </p>
             </div>
-
             <div>
               <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
                 Preferred Payment Network
@@ -191,16 +238,10 @@ export default function SettingsPage() {
                 {activeKeys
                   .filter((k) => k !== "bitcoin")
                   .map((k) => (
-                    <option key={k} value={k}>
-                      {allNetworks[k]?.name}
-                    </option>
+                    <option key={k} value={k}>{allNetworks[k]?.name}</option>
                   ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1">
-                Auto prefers L2 networks for low fees.
-              </p>
             </div>
-
             <div>
               <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
                 Routing Mode
@@ -217,13 +258,6 @@ export default function SettingsPage() {
               </select>
             </div>
           </div>
-
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              In Simple mode, transfers use stablecoins on the cheapest available
-              network. Switch to Advanced mode for full control.
-            </p>
-          </div>
         </section>
       )}
 
@@ -233,30 +267,40 @@ export default function SettingsPage() {
           <section>
             <h2 className="text-lg font-bold mb-3">Active Networks</h2>
             {activeKeys.length === 0 && (
-              <p className="text-sm text-gray-400">
-                No networks added. Add one below.
-              </p>
+              <p className="text-sm text-gray-400">No networks added. Add one below.</p>
             )}
-            <div className="space-y-4">
+            <div className="space-y-2">
               {activeKeys.map((key) => {
                 const net = allNetworks[key];
                 const ns = settings.networks[key];
                 const assetDefs = getAssetsForNetwork(key);
+                const customTokens = getCustomTokensForNetwork(key);
                 const enabledCount = Object.values(ns.tokens).filter(
                   (t) => t.added && t.visible
                 ).length;
+                const isExpanded = expandedNets[key] ?? false;
+                const currentPath = getDerivationPath(key);
+                const isEditingPath = editPathNet === key;
 
                 return (
                   <div
                     key={key}
-                    className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4"
+                    className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg overflow-hidden"
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    {/* Collapsible header */}
+                    <div
+                      className="flex items-center justify-between p-4 cursor-pointer select-none"
+                      onClick={() => toggleExpanded(key)}
+                    >
                       <div className="flex items-center gap-3">
+                        <span className={`text-xs transition-transform ${isExpanded ? "rotate-90" : ""}`}>
+                          &#9654;
+                        </span>
                         <input
                           type="checkbox"
                           checked={ns.visible}
-                          onChange={() => toggleNetworkVisible(key)}
+                          onChange={(e) => { e.stopPropagation(); toggleNetworkVisible(key); }}
+                          onClick={(e) => e.stopPropagation()}
                           className="w-4 h-4 cursor-pointer"
                           title="Show/hide in wallet"
                         />
@@ -268,84 +312,214 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() =>
-                          setModalAction({ type: "removeNetwork", key })
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setModalAction({ type: "removeNetwork", key });
+                        }}
                         className="text-xs bg-m-red hover:bg-red-700 text-white font-bold py-1 px-3 rounded"
                       >
                         Remove
                       </button>
                     </div>
 
-                    {isAdvanced && (
-                      <div className="ml-7 text-xs text-gray-500 mb-2">
-                        <span className="font-mono">{net.derivationPath}</span>
-                        <span className="mx-2 hidden sm:inline">|</span>
-                        <span className="font-mono text-xs break-all block sm:inline mt-1 sm:mt-0">
-                          {addresses[key]}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="ml-7 space-y-1">
-                      {Object.entries(ns.tokens).map(([symbol, ts]) => {
-                        const isNative = symbol === net.nativeCurrency.symbol;
-                        const def = assetDefs.find((a) => a.symbol === symbol);
-                        return (
-                          <div
-                            key={symbol}
-                            className="flex items-center justify-between py-1"
-                          >
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={ts.visible && ts.added}
-                                onChange={() => toggleTokenVisible(key, symbol)}
-                                disabled={!ts.added}
-                                className="w-3.5 h-3.5 cursor-pointer"
-                              />
-                              <span className="text-sm">
-                                {symbol}
-                                {isNative && (
-                                  <span className="text-xs text-gray-400 ml-1">(gas)</span>
-                                )}
-                                {def?.isStablecoin && (
-                                  <span className="text-xs text-green-500 ml-1">(stable)</span>
-                                )}
-                              </span>
+                    {/* Expanded content */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4">
+                        {/* Derivation path */}
+                        {isAdvanced && (
+                          <div className="mb-3 p-2 bg-gray-100 dark:bg-m-blue-dark-4 rounded text-xs">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-gray-500">Derivation Path</span>
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => handleAutoIncrement(key)}
+                                  className="text-blue-500 hover:text-blue-700 text-xs"
+                                  title="Auto-increment last index"
+                                >
+                                  +1
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditPathNet(key);
+                                    setEditPathValue(currentPath);
+                                  }}
+                                  className="text-blue-500 hover:text-blue-700 text-xs"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             </div>
-                            {ts.added && !isNative && (
-                              <button
-                                onClick={() =>
-                                  setModalAction({
-                                    type: "removeToken",
-                                    networkKey: key,
-                                    symbol,
-                                  })
-                                }
-                                className="text-xs text-m-red hover:text-red-700"
-                              >
-                                Remove
-                              </button>
+                            {isEditingPath ? (
+                              <div className="flex gap-1 mt-1">
+                                <input
+                                  type="text"
+                                  value={editPathValue}
+                                  onChange={(e) => setEditPathValue(e.target.value)}
+                                  className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <button
+                                  onClick={handleSavePath}
+                                  className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => setEditPathNet(null)}
+                                  className="text-xs text-gray-400 hover:text-gray-600"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="font-mono">{currentPath}</span>
                             )}
-                            {!ts.added && (
+                            <div className="mt-1 font-mono text-gray-400 break-all">
+                              {addresses[key]}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Token list */}
+                        <div className="space-y-1 ml-2">
+                          {Object.entries(ns.tokens).map(([symbol, ts]) => {
+                            const isNative = symbol === net.nativeCurrency.symbol;
+                            const def = assetDefs.find((a) => a.symbol === symbol);
+                            const isCustom = customTokens.some((ct) => ct.symbol === symbol);
+                            return (
+                              <div
+                                key={symbol}
+                                className="flex items-center justify-between py-1"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={ts.visible && ts.added}
+                                    onChange={() => toggleTokenVisible(key, symbol)}
+                                    disabled={!ts.added}
+                                    className="w-3.5 h-3.5 cursor-pointer"
+                                  />
+                                  <span className="text-sm">
+                                    {symbol}
+                                    {isNative && (
+                                      <span className="text-xs text-gray-400 ml-1">(gas)</span>
+                                    )}
+                                    {def?.isStablecoin && (
+                                      <span className="text-xs text-green-500 ml-1">(stable)</span>
+                                    )}
+                                    {isCustom && (
+                                      <span className="text-xs text-purple-500 ml-1">(custom)</span>
+                                    )}
+                                  </span>
+                                </div>
+                                {isCustom ? (
+                                  <button
+                                    onClick={() => removeCustomToken(key, symbol)}
+                                    className="text-xs text-m-red hover:text-red-700"
+                                  >
+                                    Remove
+                                  </button>
+                                ) : ts.added && !isNative ? (
+                                  <button
+                                    onClick={() =>
+                                      setModalAction({ type: "removeToken", networkKey: key, symbol })
+                                    }
+                                    className="text-xs text-m-red hover:text-red-700"
+                                  >
+                                    Remove
+                                  </button>
+                                ) : !ts.added ? (
+                                  <button
+                                    onClick={() =>
+                                      setModalAction({ type: "addToken", networkKey: key, symbol })
+                                    }
+                                    className="text-xs text-blue-500 hover:text-blue-700"
+                                  >
+                                    Add
+                                  </button>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Add custom token (Advanced) */}
+                        {isAdvanced && net.chainType !== "bitcoin" && (
+                          <div className="mt-3">
+                            {addTokenNet === key ? (
+                              <div className="p-3 border border-gray-200 dark:border-gray-600 rounded space-y-2">
+                                <p className="text-xs font-bold text-gray-600 dark:text-gray-300">
+                                  Add Custom Token
+                                </p>
+                                <input
+                                  type="text"
+                                  value={customAddr}
+                                  onChange={(e) => setCustomAddr(e.target.value)}
+                                  placeholder="Contract / Mint address"
+                                  className="px-2 py-1 border border-gray-300 rounded w-full text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                />
+                                <div className="grid grid-cols-3 gap-2">
+                                  <input
+                                    type="text"
+                                    value={customSymbol}
+                                    onChange={(e) => setCustomSymbol(e.target.value)}
+                                    placeholder="Symbol"
+                                    className="px-2 py-1 border border-gray-300 rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={customName}
+                                    onChange={(e) => setCustomName(e.target.value)}
+                                    placeholder="Name"
+                                    className="px-2 py-1 border border-gray-300 rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  />
+                                  <input
+                                    type="number"
+                                    value={customDecimals}
+                                    onChange={(e) => setCustomDecimals(e.target.value)}
+                                    placeholder="Decimals"
+                                    className="px-2 py-1 border border-gray-300 rounded text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  />
+                                </div>
+                                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded p-2">
+                                  <p className="text-[10px] text-yellow-700 dark:text-yellow-300">
+                                    This token is not on the recommended list. Verify the contract address carefully.
+                                  </p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={handleAddCustomToken}
+                                    disabled={!customAddr.trim() || !customSymbol.trim()}
+                                    className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-1 px-3 rounded disabled:opacity-50"
+                                  >
+                                    Add Token
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setAddTokenNet(null);
+                                      setCustomAddr("");
+                                      setCustomSymbol("");
+                                      setCustomName("");
+                                      setCustomDecimals("18");
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
                               <button
-                                onClick={() =>
-                                  setModalAction({
-                                    type: "addToken",
-                                    networkKey: key,
-                                    symbol,
-                                  })
-                                }
+                                onClick={() => setAddTokenNet(key)}
                                 className="text-xs text-blue-500 hover:text-blue-700"
                               >
-                                Add
+                                + Add custom token
                               </button>
                             )}
                           </div>
-                        );
-                      })}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -377,9 +551,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <button
-                        onClick={() =>
-                          setModalAction({ type: "addNetwork", key })
-                        }
+                        onClick={() => setModalAction({ type: "addNetwork", key })}
                         className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-1 px-3 rounded flex-shrink-0"
                       >
                         Add
@@ -397,7 +569,6 @@ export default function SettingsPage() {
       {tab === "recovery" && (
         <section>
           <h2 className="text-lg font-bold mb-3">Mnemonic Phrase</h2>
-
           {!showMnemonic ? (
             <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4">
               <p className="font-mono text-sm break-all leading-relaxed">
@@ -420,26 +591,23 @@ export default function SettingsPage() {
                   location.
                 </p>
               </div>
-
               <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4">
                 <p className="font-mono text-sm break-all leading-relaxed">
                   {mnemonic}
                 </p>
               </div>
-
               {qrData && (
                 <div>
                   <h3 className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-2">
                     Encrypted QR Code
                   </h3>
                   <p className="text-xs text-gray-400 mb-3">
-                    Scan with wallet2qr to restore your wallet. This QR uses the
-                    same format as text2qr — fully compatible.
+                    Scan with wallet2qr to restore your wallet. Same format as
+                    text2qr — fully compatible.
                   </p>
                   <QrCanvas data={qrData} />
                 </div>
               )}
-
               <button
                 onClick={() => setShowMnemonic(false)}
                 className="text-xs bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-1 px-3 rounded"

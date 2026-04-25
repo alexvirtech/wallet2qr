@@ -8,7 +8,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import { allNetworks } from "./networks";
+import { allNetworks, type TokenConfig } from "./networks";
 import { getAssetsForNetwork } from "./assets";
 
 export type UiMode = "simple" | "advanced";
@@ -25,6 +25,16 @@ interface NetworkSetting {
   added: boolean;
   visible: boolean;
   tokens: Record<string, TokenSetting>;
+  derivationPath?: string;
+}
+
+export interface CustomToken {
+  symbol: string;
+  name: string;
+  address: string;
+  decimals: number;
+  coingeckoId: string;
+  networkKey: string;
 }
 
 export interface WalletSettings {
@@ -33,6 +43,7 @@ export interface WalletSettings {
   preferredPaymentAsset: PaymentAssetPref;
   preferredPaymentNetwork: PaymentNetworkPref;
   routingMode: RoutingMode;
+  customTokens: CustomToken[];
 }
 
 const STORAGE_KEY = "wallet2qr_settings";
@@ -58,6 +69,7 @@ function buildDefaultSettings(): WalletSettings {
     preferredPaymentAsset: "auto",
     preferredPaymentNetwork: "auto",
     routingMode: "lowest_fee",
+    customTokens: [],
   };
 }
 
@@ -73,6 +85,7 @@ function loadSettings(): WalletSettings {
     if (!stored.preferredPaymentAsset) stored.preferredPaymentAsset = defaults.preferredPaymentAsset;
     if (!stored.preferredPaymentNetwork) stored.preferredPaymentNetwork = defaults.preferredPaymentNetwork;
     if (!stored.routingMode) stored.routingMode = defaults.routingMode;
+    if (!stored.customTokens) stored.customTokens = [];
 
     for (const key of Object.keys(defaults.networks)) {
       if (!stored.networks[key]) {
@@ -85,6 +98,13 @@ function loadSettings(): WalletSettings {
         }
       }
     }
+
+    for (const ct of stored.customTokens) {
+      if (stored.networks[ct.networkKey] && !stored.networks[ct.networkKey].tokens[ct.symbol]) {
+        stored.networks[ct.networkKey].tokens[ct.symbol] = { added: true, visible: true };
+      }
+    }
+
     return stored;
   } catch {
     return buildDefaultSettings();
@@ -109,8 +129,14 @@ interface SettingsContextValue {
   addToken: (networkKey: string, symbol: string) => void;
   removeToken: (networkKey: string, symbol: string) => void;
   toggleTokenVisible: (networkKey: string, symbol: string) => void;
+  addCustomToken: (token: CustomToken) => void;
+  removeCustomToken: (networkKey: string, symbol: string) => void;
+  setDerivationPath: (networkKey: string, path: string) => void;
   getActiveNetworkKeys: () => string[];
   getVisibleTokens: (networkKey: string) => string[];
+  getDerivationPath: (networkKey: string) => string;
+  getCustomTokensForNetwork: (networkKey: string) => CustomToken[];
+  getAllTokensForNetwork: (networkKey: string) => TokenConfig[];
 }
 
 const SettingsContext = createContext<SettingsContextValue>(null!);
@@ -234,6 +260,47 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [settings, persist]
   );
 
+  const addCustomToken = useCallback(
+    (token: CustomToken) => {
+      const next = structuredClone(settings);
+      const exists = next.customTokens.some(
+        (t) => t.networkKey === token.networkKey && t.symbol === token.symbol
+      );
+      if (exists) return;
+      next.customTokens.push(token);
+      if (next.networks[token.networkKey]) {
+        next.networks[token.networkKey].tokens[token.symbol] = { added: true, visible: true };
+      }
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const removeCustomToken = useCallback(
+    (networkKey: string, symbol: string) => {
+      const next = structuredClone(settings);
+      next.customTokens = next.customTokens.filter(
+        (t) => !(t.networkKey === networkKey && t.symbol === symbol)
+      );
+      if (next.networks[networkKey]?.tokens[symbol]) {
+        delete next.networks[networkKey].tokens[symbol];
+      }
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setDerivationPath = useCallback(
+    (networkKey: string, path: string) => {
+      const next = structuredClone(settings);
+      if (next.networks[networkKey]) {
+        next.networks[networkKey].derivationPath = path;
+      }
+      persist(next);
+    },
+    [settings, persist]
+  );
+
   const getActiveNetworkKeys = useCallback(() => {
     return Object.keys(settings.networks).filter(
       (k) => settings.networks[k].added && settings.networks[k].visible
@@ -247,6 +314,41 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       return Object.keys(ns.tokens).filter(
         (s) => ns.tokens[s].added && ns.tokens[s].visible
       );
+    },
+    [settings]
+  );
+
+  const getDerivationPath = useCallback(
+    (networkKey: string) => {
+      const override = settings.networks[networkKey]?.derivationPath;
+      if (override) return override;
+      return allNetworks[networkKey]?.derivationPath ?? "m/44'/60'/0'/0/0";
+    },
+    [settings]
+  );
+
+  const getCustomTokensForNetwork = useCallback(
+    (networkKey: string) => {
+      return settings.customTokens.filter((t) => t.networkKey === networkKey);
+    },
+    [settings]
+  );
+
+  const getAllTokensForNetwork = useCallback(
+    (networkKey: string): TokenConfig[] => {
+      const net = allNetworks[networkKey];
+      if (!net) return [];
+      const builtIn = [...net.tokens];
+      const custom = settings.customTokens
+        .filter((t) => t.networkKey === networkKey)
+        .map((t) => ({
+          symbol: t.symbol,
+          name: t.name,
+          address: t.address,
+          decimals: t.decimals,
+          coingeckoId: t.coingeckoId,
+        }));
+      return [...builtIn, ...custom];
     },
     [settings]
   );
@@ -265,8 +367,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         addToken,
         removeToken,
         toggleTokenVisible,
+        addCustomToken,
+        removeCustomToken,
+        setDerivationPath,
         getActiveNetworkKeys,
         getVisibleTokens,
+        getDerivationPath,
+        getCustomTokensForNetwork,
+        getAllTokensForNetwork,
       }}
     >
       {children}

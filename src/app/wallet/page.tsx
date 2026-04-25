@@ -10,9 +10,18 @@ import NetworkSwitcher from "@/components/NetworkSwitcher";
 import BalanceList from "@/components/BalanceList";
 import QRCode from "qrcode";
 
+const SHORT_NAMES: Record<string, string> = {
+  arbitrum: "Arbitrum",
+  ethereum: "Ethereum",
+  bnb: "BNB",
+  avalanche: "Avalanche",
+  solana: "Solana",
+  bitcoin: "Bitcoin",
+};
+
 export default function WalletPage() {
   const { mnemonic, isUnlocked } = useSession();
-  const { settings, getActiveNetworkKeys } = useSettings();
+  const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
 
   const activeKeys = getActiveNetworkKeys();
@@ -46,6 +55,7 @@ export default function WalletPage() {
   }, [activeKeys, networkKey]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
+  const derivationPath = useMemo(() => getDerivationPath(networkKey), [networkKey, getDerivationPath]);
 
   const account = useMemo(() => {
     if (!mnemonic) return null;
@@ -104,22 +114,19 @@ export default function WalletPage() {
 
       {isSimple && activeKeys.length > 1 && (
         <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          {activeKeys.map((k) => {
-            const net = getNetwork(k);
-            return (
-              <button
-                key={k}
-                onClick={() => handleNetworkChange(k)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                  k === networkKey
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-100 dark:bg-m-blue-dark-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                {net.nativeCurrency.symbol}
-              </button>
-            );
-          })}
+          {activeKeys.map((k) => (
+            <button
+              key={k}
+              onClick={() => handleNetworkChange(k)}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                k === networkKey
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100 dark:bg-m-blue-dark-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              {SHORT_NAMES[k] ?? k}
+            </button>
+          ))}
         </div>
       )}
 
@@ -127,10 +134,9 @@ export default function WalletPage() {
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <canvas ref={addressQrRef} className="rounded flex-shrink-0" />
           <div className="flex-1 min-w-0 text-center sm:text-left">
-            <p className="text-xs text-gray-400 mb-1">
-              {isSimple ? "Your Address" : `Your Address (${network.name})`}
-            </p>
+            <p className="text-xs text-gray-400 mb-1">{network.name}</p>
             <p className="font-mono text-xs sm:text-sm break-all">{account.address}</p>
+            <p className="text-[10px] text-gray-400 font-mono mt-1">{derivationPath}</p>
             <button
               onClick={copyAddress}
               className="mt-2 text-xs text-blue-500 hover:text-blue-700"
@@ -141,7 +147,12 @@ export default function WalletPage() {
         </div>
       </div>
 
-      <BalanceList network={network} address={account.address} showTotalUsd={isSimple} />
+      <BalanceList
+        network={network}
+        address={account.address}
+        showTotalUsd={isSimple}
+        networkKey={networkKey}
+      />
 
       <div className="flex gap-3 mt-6">
         {network.chainType === "evm" && (

@@ -38,10 +38,10 @@ export function validateBip39Mnemonic(phrase: string): {
   return { valid: true };
 }
 
-export function deriveEvmAccount(mnemonic: string) {
+export function deriveEvmAccount(mnemonic: string, path?: string) {
   const seed = mnemonicToSeedSync(mnemonic.trim().toLowerCase());
   const hd = HDKey.fromMasterSeed(seed);
-  const child = hd.derive(EVM_PATH);
+  const child = hd.derive(path || EVM_PATH);
   if (!child.privateKey) throw new Error("Failed to derive private key");
 
   const privateKeyHex = `0x${Buffer.from(child.privateKey).toString("hex")}` as Hex;
@@ -54,15 +54,24 @@ export function deriveEvmAccount(mnemonic: string) {
   };
 }
 
-export function deriveAccount(mnemonic: string, chainType: ChainType) {
+export function deriveAccount(mnemonic: string, chainType: ChainType, path?: string) {
   if (chainType === "solana") {
     const sol = deriveSolanaAccount(mnemonic);
     return { address: sol.address, privateKey: sol.privateKey };
   }
   if (chainType === "bitcoin") {
-    const btc = deriveBitcoinAccount(mnemonic);
+    const btc = deriveBitcoinAccount(mnemonic, path);
     return { address: btc.address, privateKey: btc.privateKey };
   }
-  const evm = deriveEvmAccount(mnemonic);
+  const evm = deriveEvmAccount(mnemonic, path);
   return { address: evm.address as string, privateKey: evm.privateKey as string };
+}
+
+export function incrementDerivationPath(path: string): string {
+  const parts = path.replace(/'/g, "'").split("/");
+  const last = parts[parts.length - 1];
+  const isHardened = last.endsWith("'");
+  const index = parseInt(last.replace("'", ""), 10);
+  parts[parts.length - 1] = `${index + 1}${isHardened ? "'" : ""}`;
+  return parts.join("/");
 }

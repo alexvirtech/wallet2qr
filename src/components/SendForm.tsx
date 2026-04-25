@@ -31,6 +31,8 @@ export default function SendForm({
     ...network.tokens.map((t) => ({ value: t.symbol, label: t.symbol })),
   ];
 
+  const selectedLabel = asset === "native" ? network.nativeCurrency.symbol : asset;
+
   const handleEstimate = useCallback(async () => {
     setError(null);
     if (!isAddress(to)) {
@@ -82,42 +84,37 @@ export default function SendForm({
   }, [network, privateKey, to, amount, asset, onSuccess]);
 
   return (
-    <div className="space-y-4">
+    <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-5 space-y-5">
       <div>
-        <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-          Recipient Address
+        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Recipient
         </label>
         <input
           type="text"
           value={to}
           onChange={(e) => setTo(e.target.value)}
           placeholder="0x..."
-          className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 font-mono text-sm"
+          className="mt-1.5 px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg w-full dark:bg-m-blue-dark-2 dark:text-gray-200 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="flex-1">
-          <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-            Amount
-          </label>
+      <div>
+        <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+          Amount
+        </label>
+        <div className="mt-1.5 flex rounded-lg border border-gray-300 dark:border-gray-600 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500/40">
           <input
             type="number"
             step="any"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.0"
-            className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 font-mono text-sm"
+            className="flex-1 px-3 py-2.5 dark:bg-m-blue-dark-2 dark:text-gray-200 font-mono text-sm focus:outline-none min-w-0 border-none"
           />
-        </div>
-        <div>
-          <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-            Asset
-          </label>
           <select
             value={asset}
             onChange={(e) => setAsset(e.target.value)}
-            className="mt-1 px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
+            className="px-3 py-2.5 bg-gray-100 dark:bg-m-blue-dark-2 dark:text-gray-200 text-sm font-bold border-l border-gray-300 dark:border-gray-600 cursor-pointer focus:outline-none"
           >
             {assets.map((a) => (
               <option key={a.value} value={a.value}>
@@ -129,32 +126,33 @@ export default function SendForm({
       </div>
 
       {gasEstimate && confirming && (
-        <div className="bg-gray-50 dark:bg-m-blue-dark-3 p-3 rounded-lg text-sm space-y-1">
-          <p>
-            <span className="font-bold">To:</span>{" "}
-            <span className="font-mono text-xs">{to}</span>
-          </p>
-          <p>
-            <span className="font-bold">Amount:</span> {amount}{" "}
-            {asset === "native" ? network.nativeCurrency.symbol : asset}
-          </p>
-          <p>
-            <span className="font-bold">Est. Gas:</span> {gasEstimate}{" "}
-            {network.nativeCurrency.symbol}
-          </p>
-          <p>
-            <span className="font-bold">Network:</span> {network.name}
-          </p>
+        <div className="bg-white dark:bg-m-blue-dark-2 border border-gray-200 dark:border-gray-600 rounded-lg p-4 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500 dark:text-gray-400">To</span>
+            <span className="font-mono text-xs max-w-[60%] truncate">{to}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Amount</span>
+            <span className="font-bold">{amount} {selectedLabel}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Est. Gas</span>
+            <span className="font-mono">{gasEstimate} {network.nativeCurrency.symbol}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500 dark:text-gray-400">Network</span>
+            <span>{network.name}</span>
+          </div>
         </div>
       )}
 
       {error && <p className="text-m-red text-sm">{error}</p>}
 
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         {!confirming ? (
           <button
             onClick={handleEstimate}
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm"
+            className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-colors"
           >
             Review
           </button>
@@ -163,13 +161,13 @@ export default function SendForm({
             <button
               onClick={handleSend}
               disabled={sending}
-              className="bg-m-green hover:bg-green-600 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
+              className="flex-1 bg-m-green hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg text-sm disabled:opacity-50 transition-colors"
             >
               {sending ? "Sending..." : "Confirm & Send"}
             </button>
             <button
               onClick={() => setConfirming(false)}
-              className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-1.5 px-4 rounded-md text-sm"
+              className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold py-2.5 px-6 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
