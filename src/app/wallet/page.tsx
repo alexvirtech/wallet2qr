@@ -103,8 +103,6 @@ export default function WalletPage() {
     );
   }
 
-  const isBitcoin = network.chainType === "bitcoin";
-
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
@@ -178,21 +176,13 @@ export default function WalletPage() {
         >
           Receive
         </button>
-        {!isBitcoin && (
-          <button
-            onClick={() => router.push("/wallet/exchange")}
-            className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
-          >
-            Exchange
-          </button>
-        )}
+        <button
+          onClick={() => router.push("/wallet/exchange")}
+          className="flex-1 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm"
+        >
+          Exchange
+        </button>
       </div>
-
-      {isBitcoin && (
-        <p className="text-xs text-gray-400 mt-2 text-center">
-          Bitcoin is view-only. Send and exchange features coming soon.
-        </p>
-      )}
     </div>
   );
 }
