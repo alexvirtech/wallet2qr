@@ -31,7 +31,7 @@ A formal third-party security audit is planned after the core wallet architectur
 
 If you discover a security vulnerability, please report it responsibly:
 
-- **Email**: security@wallet2qr.com
+- **Email**: alex@extrasafe.chat
 - **Do not** open a public GitHub issue for security vulnerabilities.
 - We aim to acknowledge reports within 48 hours and provide a resolution timeline within 7 days.
 
