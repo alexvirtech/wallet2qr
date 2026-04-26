@@ -7,7 +7,14 @@ import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
 import { getSolNativeBalance, getSplTokenBalance } from "@/lib/wallet/solana";
 import { getBtcBalance } from "@/lib/wallet/bitcoin";
 import { fetchPrices } from "@/lib/wallet/prices";
+import {
+  isProxyEnabled,
+  fetchProxyBalances,
+  buildBalanceLookup,
+  lookupBalance,
+} from "@/lib/wallet/proxyClient";
 import { useSettings } from "@/lib/wallet/settings";
+import { useSession } from "@/lib/state/session";
 import { getAssetsForNetwork, type AssetCategory } from "@/lib/wallet/assets";
 import TokenIcon from "@/components/TokenIcon";
 import type { Address } from "viem";
@@ -71,18 +78,174 @@ function saveCachedBalances(data: Record<string, BalanceItem[]>) {
   } catch {}
 }
 
-function cacheKey(accounts: NetworkAccount[]): string {
+function cacheKeyFor(accounts: NetworkAccount[]): string {
   return accounts.map((a) => `${a.networkKey}:${a.address}`).join("|");
 }
 
+async function refreshViaProxy(
+  accounts: NetworkAccount[],
+  getVisibleTokens: (key: string) => string[],
+): Promise<BalanceItem[]> {
+  const evmAccount = accounts.find((a) => a.network.chainType === "evm");
+  const solAccount = accounts.find((a) => a.network.chainType === "solana");
+  const btcAccount = accounts.find((a) => a.network.chainType === "bitcoin");
+
+  const [prices, proxyResponse] = await Promise.all([
+    fetchPrices(),
+    fetchProxyBalances(
+      evmAccount?.address,
+      solAccount?.address,
+      btcAccount?.address,
+    ),
+  ]);
+
+  const balanceMap = buildBalanceLookup(proxyResponse);
+  const items: BalanceItem[] = [];
+
+  for (const { network, networkKey } of accounts) {
+    const visibleSymbols = getVisibleTokens(networkKey);
+    const assetDefs = getAssetsForNetwork(network.key);
+
+    if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
+      const entry = lookupBalance(balanceMap, networkKey, "");
+      const raw = entry ? parseFloat(entry.balance) : 0;
+      const price = prices[network.nativeCurrency.symbol] ?? 0;
+      const usd = raw * price;
+      const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
+      items.push({
+        symbol: network.nativeCurrency.symbol,
+        name: network.nativeCurrency.name,
+        balance: formatBalance(raw === 0 ? "0" : entry?.balance ?? "0"),
+        rawBalance: raw,
+        usdValue: formatUsd(usd),
+        usdNum: usd,
+        category: nativeDef?.category ?? "gas",
+        address: "",
+        tokenType: "native",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+
+    for (const token of network.tokens) {
+      if (!visibleSymbols.includes(token.symbol)) continue;
+      const entry = lookupBalance(balanceMap, networkKey, token.address);
+      const raw = entry ? parseFloat(entry.balance) : 0;
+      const price = prices[token.symbol] ?? 0;
+      const usd = raw * price;
+      const def = assetDefs.find((a) => a.symbol === token.symbol);
+      items.push({
+        symbol: token.symbol,
+        name: token.name,
+        balance: formatBalance(raw === 0 ? "0" : entry?.balance ?? "0"),
+        rawBalance: raw,
+        usdValue: formatUsd(usd),
+        usdNum: usd,
+        category: def?.category ?? "ecosystem",
+        address: token.address,
+        tokenType: "token",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+  }
+
+  return items;
+}
+
+async function refreshDirect(
+  accounts: NetworkAccount[],
+  getVisibleTokens: (key: string) => string[],
+): Promise<BalanceItem[]> {
+  const prices = await fetchPrices();
+  const items: BalanceItem[] = [];
+
+  for (const { network, address, networkKey } of accounts) {
+    const visibleSymbols = getVisibleTokens(networkKey);
+    const assetDefs = getAssetsForNetwork(network.key);
+
+    if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
+      let nativeBal: { formatted: string };
+      if (network.chainType === "bitcoin") {
+        nativeBal = await getBtcBalance(address);
+      } else if (network.chainType === "solana") {
+        nativeBal = await getSolNativeBalance(network, address);
+      } else {
+        nativeBal = await getNativeBalance(network, address as Address);
+      }
+      const raw = parseFloat(nativeBal.formatted);
+      const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
+      const nativeUsd = raw * nativePrice;
+      const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
+      items.push({
+        symbol: network.nativeCurrency.symbol,
+        name: network.nativeCurrency.name,
+        balance: formatBalance(nativeBal.formatted),
+        rawBalance: raw,
+        usdValue: formatUsd(nativeUsd),
+        usdNum: nativeUsd,
+        category: nativeDef?.category ?? "gas",
+        address: "",
+        tokenType: "native",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+
+    for (const token of network.tokens) {
+      if (!visibleSymbols.includes(token.symbol)) continue;
+      let bal: { formatted: string };
+      if (network.chainType === "solana") {
+        bal = await getSplTokenBalance(network, address, token.address);
+      } else {
+        bal = await getTokenBalance(
+          network,
+          token.address as Address,
+          address as Address,
+          token.decimals
+        );
+      }
+      const raw = parseFloat(bal.formatted);
+      const price = prices[token.symbol] ?? 0;
+      const usd = raw * price;
+      const def = assetDefs.find((a) => a.symbol === token.symbol);
+      items.push({
+        symbol: token.symbol,
+        name: token.name,
+        balance: formatBalance(bal.formatted),
+        rawBalance: raw,
+        usdValue: formatUsd(usd),
+        usdNum: usd,
+        category: def?.category ?? "ecosystem",
+        address: token.address,
+        tokenType: "token",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+  }
+
+  return items;
+}
+
 export default function BalanceList({ accounts, hideZero, onTotalChange }: BalanceListProps) {
-  const [balances, setBalances] = useState<BalanceItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [balances, setBalances] = useState<BalanceItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    const cached = loadCachedBalances();
+    return cached[cacheKeyFor(accounts)] ?? [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const cached = loadCachedBalances();
+    return !cached[cacheKeyFor(accounts)];
+  });
   const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<BalanceItem | null>(null);
   const { getVisibleTokens, getDerivationPath } = useSettings();
+  const { readOnly } = useSession();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const accountsRef = useRef(cacheKey(accounts));
+  const accountsRef = useRef(cacheKeyFor(accounts));
+  const lastRefreshRef = useRef(0);
 
   const expectedCount = accounts.reduce(
     (sum, a) => sum + getVisibleTokens(a.networkKey).length,
@@ -90,80 +253,19 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
   );
 
   const refresh = useCallback(async (silent = false) => {
+    const now = Date.now();
+    if (!silent && now - lastRefreshRef.current < 10_000) return;
+    lastRefreshRef.current = now;
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const prices = await fetchPrices();
-      const items: BalanceItem[] = [];
-
-      for (const { network, address, networkKey } of accounts) {
-        const visibleSymbols = getVisibleTokens(networkKey);
-        const assetDefs = getAssetsForNetwork(network.key);
-
-        if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
-          let nativeBal: { formatted: string };
-          if (network.chainType === "bitcoin") {
-            nativeBal = await getBtcBalance(address);
-          } else if (network.chainType === "solana") {
-            nativeBal = await getSolNativeBalance(network, address);
-          } else {
-            nativeBal = await getNativeBalance(network, address as Address);
-          }
-          const raw = parseFloat(nativeBal.formatted);
-          const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
-          const nativeUsd = raw * nativePrice;
-          const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
-          items.push({
-            symbol: network.nativeCurrency.symbol,
-            name: network.nativeCurrency.name,
-            balance: formatBalance(nativeBal.formatted),
-            rawBalance: raw,
-            usdValue: formatUsd(nativeUsd),
-            usdNum: nativeUsd,
-            category: nativeDef?.category ?? "gas",
-            address: "",
-            tokenType: "native",
-            networkKey,
-            networkName: network.name,
-          });
-        }
-
-        for (const token of network.tokens) {
-          if (!visibleSymbols.includes(token.symbol)) continue;
-          let bal: { formatted: string };
-          if (network.chainType === "solana") {
-            bal = await getSplTokenBalance(network, address, token.address);
-          } else {
-            bal = await getTokenBalance(
-              network,
-              token.address as Address,
-              address as Address,
-              token.decimals
-            );
-          }
-          const raw = parseFloat(bal.formatted);
-          const price = prices[token.symbol] ?? 0;
-          const usd = raw * price;
-          const def = assetDefs.find((a) => a.symbol === token.symbol);
-          items.push({
-            symbol: token.symbol,
-            name: token.name,
-            balance: formatBalance(bal.formatted),
-            rawBalance: raw,
-            usdValue: formatUsd(usd),
-            usdNum: usd,
-            category: def?.category ?? "ecosystem",
-            address: token.address,
-            tokenType: "token",
-            networkKey,
-            networkName: network.name,
-          });
-        }
-      }
+      const items = isProxyEnabled()
+        ? await refreshViaProxy(accounts, getVisibleTokens)
+        : await refreshDirect(accounts, getVisibleTokens);
 
       setBalances(items);
       const cached = loadCachedBalances();
-      cached[cacheKey(accounts)] = items;
+      cached[cacheKeyFor(accounts)] = items;
       saveCachedBalances(cached);
     } catch (e) {
       setError("Failed to load balances");
@@ -174,19 +276,20 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
   }, [accounts, getVisibleTokens]);
 
   useEffect(() => {
-    const key = cacheKey(accounts);
+    const key = cacheKeyFor(accounts);
     if (accountsRef.current !== key) {
       accountsRef.current = key;
       const cached = loadCachedBalances();
       if (cached[key]) {
         setBalances(cached[key]);
         setLoading(false);
+        refresh(true);
+        return;
       } else {
         setBalances([]);
-        setLoading(true);
       }
     }
-    refresh();
+    refresh(balances.length > 0);
   }, [refresh]);
 
   useEffect(() => {
@@ -281,6 +384,7 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
           walletAddress={accounts.find((a) => a.networkKey === selectedAsset.networkKey)?.address ?? ""}
           derivationPath={getDerivationPath(selectedAsset.networkKey)}
           chainType={allNetworks[selectedAsset.networkKey]?.chainType ?? "evm"}
+          readOnly={readOnly}
           networkKey={selectedAsset.networkKey}
           onClose={() => setSelectedAsset(null)}
         />
@@ -297,6 +401,7 @@ function AssetDetailModal({
   derivationPath,
   chainType,
   networkKey,
+  readOnly,
   onClose,
 }: {
   asset: BalanceItem;
@@ -306,6 +411,7 @@ function AssetDetailModal({
   derivationPath: string;
   chainType: string;
   networkKey: string;
+  readOnly: boolean;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -324,8 +430,8 @@ function AssetDetailModal({
         ? `${blockExplorer}/address/${asset.address}`
         : `${blockExplorer}/token/${asset.address}`;
 
-  const canSend = chainType === "evm" || chainType === "bitcoin";
-  const canExchange = chainType !== "solana";
+  const canSend = !readOnly && (chainType === "evm" || chainType === "bitcoin");
+  const canExchange = !readOnly && chainType !== "solana";
 
   return (
     <div

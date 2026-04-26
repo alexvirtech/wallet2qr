@@ -1,3 +1,6 @@
+import { isProxyEnabled, fetchProxyPrices } from "./proxyClient";
+import { rateLimitedFetch } from "./rateLimiter";
+
 const CACHE_TTL = 60_000;
 const LS_KEY = "w2q_prices";
 
@@ -51,6 +54,36 @@ const defaultPrices: Record<string, number> = {
   JUP: 0, PYTH: 0, CAKE: 0,
 };
 
+async function fetchFromCoinGecko(): Promise<Record<string, number>> {
+  const ids = COINGECKO_IDS.join(",");
+  const res = await rateLimitedFetch(
+    `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
+  const data = await res.json();
+
+  return {
+    ETH: data.ethereum?.usd ?? 0,
+    AVAX: data["avalanche-2"]?.usd ?? 0,
+    ARB: data.arbitrum?.usd ?? 0,
+    USDT: data.tether?.usd ?? 1,
+    SOL: data.solana?.usd ?? 0,
+    USDC: data["usd-coin"]?.usd ?? 1,
+    BTC: data.bitcoin?.usd ?? 0,
+    BNB: data.binancecoin?.usd ?? 0,
+    LINK: data.chainlink?.usd ?? 0,
+    UNI: data.uniswap?.usd ?? 0,
+    GMX: data.gmx?.usd ?? 0,
+    JOE: data.joe?.usd ?? 0,
+    QI: data.benqi?.usd ?? 0,
+    JUP: data["jupiter-exchange-solana"]?.usd ?? 0,
+    PYTH: data["pyth-network"]?.usd ?? 0,
+    CAKE: data["pancakeswap-token"]?.usd ?? 0,
+    FDUSD: data["first-digital-usd"]?.usd ?? 1,
+  };
+}
+
 export async function fetchPrices(): Promise<Record<string, number>> {
   if (cache && Date.now() - cache.timestamp < CACHE_TTL) {
     return cache.prices;
@@ -67,33 +100,9 @@ export async function fetchPrices(): Promise<Record<string, number>> {
   }
 
   try {
-    const ids = COINGECKO_IDS.join(",");
-    const res = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`,
-      { cache: "no-store" }
-    );
-    if (!res.ok) throw new Error(`CoinGecko ${res.status}`);
-    const data = await res.json();
-
-    const prices: Record<string, number> = {
-      ETH: data.ethereum?.usd ?? 0,
-      AVAX: data["avalanche-2"]?.usd ?? 0,
-      ARB: data.arbitrum?.usd ?? 0,
-      USDT: data.tether?.usd ?? 1,
-      SOL: data.solana?.usd ?? 0,
-      USDC: data["usd-coin"]?.usd ?? 1,
-      BTC: data.bitcoin?.usd ?? 0,
-      BNB: data.binancecoin?.usd ?? 0,
-      LINK: data.chainlink?.usd ?? 0,
-      UNI: data.uniswap?.usd ?? 0,
-      GMX: data.gmx?.usd ?? 0,
-      JOE: data.joe?.usd ?? 0,
-      QI: data.benqi?.usd ?? 0,
-      JUP: data["jupiter-exchange-solana"]?.usd ?? 0,
-      PYTH: data["pyth-network"]?.usd ?? 0,
-      CAKE: data["pancakeswap-token"]?.usd ?? 0,
-      FDUSD: data["first-digital-usd"]?.usd ?? 1,
-    };
+    const prices = isProxyEnabled()
+      ? await fetchProxyPrices()
+      : await fetchFromCoinGecko();
 
     cache = { prices, timestamp: Date.now() };
     if (typeof window !== "undefined") saveCachedPrices(cache);

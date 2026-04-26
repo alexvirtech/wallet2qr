@@ -1,6 +1,7 @@
 import { createPublicClient, http, fallback, erc20Abi, formatUnits, type Address, type Chain } from "viem";
 import { arbitrum, mainnet, avalanche, bsc } from "viem/chains";
 import { type NetworkConfig } from "./networks";
+import { checkClientRateLimit } from "./rateLimiter";
 
 const chainMap: Record<number, Chain> = {
   [arbitrum.id]: arbitrum,
@@ -32,6 +33,7 @@ export async function getNativeBalance(
   network: NetworkConfig,
   address: Address
 ): Promise<{ raw: bigint; formatted: string }> {
+  if (!checkClientRateLimit()) throw new Error("Rate limit exceeded");
   const client = getPublicClient(network);
   const balance = await client.getBalance({ address });
   return {
@@ -46,6 +48,7 @@ export async function getTokenBalance(
   walletAddress: Address,
   decimals: number
 ): Promise<{ raw: bigint; formatted: string }> {
+  if (!checkClientRateLimit()) throw new Error("Rate limit exceeded");
   const client = getPublicClient(network);
   const balance = await client.readContract({
     address: tokenAddress,

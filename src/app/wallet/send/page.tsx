@@ -14,7 +14,7 @@ import BtcSendForm from "@/components/BtcSendForm";
 import type { Hex } from "viem";
 
 export default function SendPage() {
-  const { mnemonic, isUnlocked } = useSession();
+  const { mnemonic, isUnlocked, readOnly } = useSession();
   const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
   const activeKeys = getActiveNetworkKeys().filter(
@@ -31,7 +31,8 @@ export default function SendPage() {
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
-  }, [isUnlocked, router]);
+    else if (readOnly) router.push("/wallet");
+  }, [isUnlocked, readOnly, router]);
 
   const account = useMemo(() => {
     if (!mnemonic) return null;

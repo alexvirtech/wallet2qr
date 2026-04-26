@@ -24,7 +24,7 @@ type ModalAction =
   | { type: "removeToken"; networkKey: string; symbol: string };
 
 export default function SettingsPage() {
-  const { mnemonic, password, isUnlocked } = useSession();
+  const { mnemonic, password, isUnlocked, readOnly } = useSession();
   const router = useRouter();
   const {
     settings,
@@ -177,6 +177,12 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {readOnly && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4 text-sm text-yellow-700 dark:text-yellow-400">
+          Read-only mode — network and asset changes are disabled.
+        </div>
+      )}
+
       <div className="flex border-b border-gray-200 dark:border-gray-600 mb-6 overflow-x-auto">
         {(
           [
@@ -295,6 +301,7 @@ export default function SettingsPage() {
                           checked={ns.visible}
                           onChange={(e) => { e.stopPropagation(); toggleNetworkVisible(key); }}
                           onClick={(e) => e.stopPropagation()}
+                          disabled={readOnly}
                           className="w-4 h-4 cursor-pointer"
                           title="Show/hide in wallet"
                         />
@@ -306,15 +313,17 @@ export default function SettingsPage() {
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setModalAction({ type: "removeNetwork", key });
-                        }}
-                        className="text-xs bg-m-red hover:bg-red-700 text-white font-bold py-1 px-3 rounded"
-                      >
-                        Remove
-                      </button>
+                      {!readOnly && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setModalAction({ type: "removeNetwork", key });
+                          }}
+                          className="text-xs bg-m-red hover:bg-red-700 text-white font-bold py-1 px-3 rounded"
+                        >
+                          Remove
+                        </button>
+                      )}
                     </div>
 
                     {isExpanded && (
@@ -329,6 +338,7 @@ export default function SettingsPage() {
                               value={currentSchemeId}
                               onChange={(e) => setScheme(key, e.target.value)}
                               onClick={(e) => e.stopPropagation()}
+                              disabled={readOnly}
                               className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full text-xs dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
                             >
                               {schemes.map((s) => (
@@ -366,7 +376,7 @@ export default function SettingsPage() {
                                       {resolveAddress(key, acc.path)}
                                     </p>
                                   </div>
-                                  {idx > 0 && (
+                                  {idx > 0 && !readOnly && (
                                     <button
                                       onClick={(e) => { e.stopPropagation(); removeAccount(key, idx); }}
                                       className="text-gray-400 hover:text-m-red text-sm flex-shrink-0"
@@ -380,45 +390,47 @@ export default function SettingsPage() {
                             </div>
                           </div>
 
-                          <div className="flex gap-3">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); addAccount(key); }}
-                              className="text-xs text-blue-500 hover:text-blue-700 font-bold"
-                            >
-                              + Add Account
-                            </button>
-                            {customPathNet === key ? (
-                              <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="text"
-                                  value={customPathValue}
-                                  onChange={(e) => setCustomPathValue(e.target.value)}
-                                  placeholder="m/44'/60'/0'/0/5"
-                                  className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-                                />
-                                <button
-                                  onClick={handleAddCustomPath}
-                                  disabled={!customPathValue.trim()}
-                                  className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded disabled:opacity-50"
-                                >
-                                  Add
-                                </button>
-                                <button
-                                  onClick={() => setCustomPathNet(null)}
-                                  className="text-xs text-gray-400 hover:text-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
+                          {!readOnly && (
+                            <div className="flex gap-3">
                               <button
-                                onClick={(e) => { e.stopPropagation(); setCustomPathNet(key); }}
-                                className="text-xs text-purple-500 hover:text-purple-700 font-bold"
+                                onClick={(e) => { e.stopPropagation(); addAccount(key); }}
+                                className="text-xs text-blue-500 hover:text-blue-700 font-bold"
                               >
-                                + Custom Path
+                                + Add Account
                               </button>
-                            )}
-                          </div>
+                              {customPathNet === key ? (
+                                <div className="flex items-center gap-1 flex-1" onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    type="text"
+                                    value={customPathValue}
+                                    onChange={(e) => setCustomPathValue(e.target.value)}
+                                    placeholder="m/44'/60'/0'/0/5"
+                                    className="flex-1 px-1.5 py-0.5 border border-gray-300 rounded text-xs font-mono dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+                                  />
+                                  <button
+                                    onClick={handleAddCustomPath}
+                                    disabled={!customPathValue.trim()}
+                                    className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-0.5 px-2 rounded disabled:opacity-50"
+                                  >
+                                    Add
+                                  </button>
+                                  <button
+                                    onClick={() => setCustomPathNet(null)}
+                                    className="text-xs text-gray-400 hover:text-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setCustomPathNet(key); }}
+                                  className="text-xs text-purple-500 hover:text-purple-700 font-bold"
+                                >
+                                  + Custom Path
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Token list */}
@@ -437,7 +449,7 @@ export default function SettingsPage() {
                                     type="checkbox"
                                     checked={ts.visible && ts.added}
                                     onChange={() => toggleTokenVisible(key, symbol)}
-                                    disabled={!ts.added}
+                                    disabled={!ts.added || readOnly}
                                     className="w-3.5 h-3.5 cursor-pointer"
                                   />
                                   <span className="text-sm">
@@ -453,39 +465,41 @@ export default function SettingsPage() {
                                     )}
                                   </span>
                                 </div>
-                                {isCustom ? (
-                                  <button
-                                    onClick={() => removeCustomToken(key, symbol)}
-                                    className="text-xs text-m-red hover:text-red-700"
-                                  >
-                                    Remove
-                                  </button>
-                                ) : ts.added && !isNative ? (
-                                  <button
-                                    onClick={() =>
-                                      setModalAction({ type: "removeToken", networkKey: key, symbol })
-                                    }
-                                    className="text-xs text-m-red hover:text-red-700"
-                                  >
-                                    Remove
-                                  </button>
-                                ) : !ts.added ? (
-                                  <button
-                                    onClick={() =>
-                                      setModalAction({ type: "addToken", networkKey: key, symbol })
-                                    }
-                                    className="text-xs text-blue-500 hover:text-blue-700"
-                                  >
-                                    Add
-                                  </button>
-                                ) : null}
+                                {!readOnly && (
+                                  isCustom ? (
+                                    <button
+                                      onClick={() => removeCustomToken(key, symbol)}
+                                      className="text-xs text-m-red hover:text-red-700"
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : ts.added && !isNative ? (
+                                    <button
+                                      onClick={() =>
+                                        setModalAction({ type: "removeToken", networkKey: key, symbol })
+                                      }
+                                      className="text-xs text-m-red hover:text-red-700"
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : !ts.added ? (
+                                    <button
+                                      onClick={() =>
+                                        setModalAction({ type: "addToken", networkKey: key, symbol })
+                                      }
+                                      className="text-xs text-blue-500 hover:text-blue-700"
+                                    >
+                                      Add
+                                    </button>
+                                  ) : null
+                                )}
                               </div>
                             );
                           })}
                         </div>
 
                         {/* Add custom token */}
-                        {net.chainType !== "bitcoin" && (
+                        {!readOnly && net.chainType !== "bitcoin" && (
                           <div>
                             {addTokenNet === key ? (
                               <div className="p-3 border border-gray-200 dark:border-gray-600 rounded space-y-2">
@@ -589,12 +603,14 @@ export default function SettingsPage() {
                             ", " + net.tokens.map((t) => t.symbol).join(", ")}
                         </div>
                       </div>
-                      <button
-                        onClick={() => setModalAction({ type: "addNetwork", key })}
-                        className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-1 px-3 rounded flex-shrink-0"
-                      >
-                        Add
-                      </button>
+                      {!readOnly && (
+                        <button
+                          onClick={() => setModalAction({ type: "addNetwork", key })}
+                          className="text-xs bg-m-green hover:bg-green-600 text-white font-bold py-1 px-3 rounded flex-shrink-0"
+                        >
+                          Add
+                        </button>
+                      )}
                     </div>
                   );
                 })}

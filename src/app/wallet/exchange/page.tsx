@@ -16,7 +16,7 @@ import type { Hex, Address } from "viem";
 type SwapProvider = "lifi" | "thorchain";
 
 export default function ExchangePage() {
-  const { mnemonic, isUnlocked } = useSession();
+  const { mnemonic, isUnlocked, readOnly } = useSession();
   const { getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
   const allActiveKeys = getActiveNetworkKeys();
@@ -28,7 +28,8 @@ export default function ExchangePage() {
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
-  }, [isUnlocked, router]);
+    else if (readOnly) router.push("/wallet");
+  }, [isUnlocked, readOnly, router]);
 
   const network = useMemo(() => getNetwork(networkKey), [networkKey]);
   const derivationPath = getDerivationPath(networkKey);

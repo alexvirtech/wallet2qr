@@ -34,9 +34,10 @@ export default function WalletPage() {
   });
   const [hideZero, setHideZero] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("w2q_hideZero") === "true";
+      const stored = localStorage.getItem("w2q_hideZero");
+      return stored === null ? true : stored === "true";
     }
-    return false;
+    return true;
   });
   const [totalUsd, setTotalUsd] = useState(0);
   const [copied, setCopied] = useState(false);

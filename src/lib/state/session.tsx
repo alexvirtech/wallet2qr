@@ -17,13 +17,14 @@ const STORAGE_KEY = "w2q_session";
 interface StoredSession {
   mnemonic: string;
   password: string;
+  readOnly?: boolean;
 }
 
-function saveToStorage(mnemonic: string, password: string) {
+function saveToStorage(mnemonic: string, password: string, readOnly: boolean) {
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ mnemonic, password } satisfies StoredSession)
+      JSON.stringify({ mnemonic, password, readOnly } satisfies StoredSession)
     );
   } catch {}
 }
@@ -47,7 +48,8 @@ function clearStorage() {
 interface SessionState {
   mnemonic: string | null;
   password: string | null;
-  setSession: (mnemonic: string, password: string) => void;
+  readOnly: boolean;
+  setSession: (mnemonic: string, password: string, readOnly?: boolean) => void;
   lock: () => void;
   isUnlocked: boolean;
   verifyPassword: (input: string) => boolean;
@@ -56,6 +58,7 @@ interface SessionState {
 const SessionContext = createContext<SessionState>({
   mnemonic: null,
   password: null,
+  readOnly: false,
   setSession: () => {},
   lock: () => {},
   isUnlocked: false,
@@ -65,6 +68,7 @@ const SessionContext = createContext<SessionState>({
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [mnemonic, setMnemonicRaw] = useState<string | null>(null);
   const [password, setPasswordRaw] = useState<string | null>(null);
+  const [readOnly, setReadOnlyRaw] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,6 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (stored) {
       setMnemonicRaw(stored.mnemonic);
       setPasswordRaw(stored.password);
+      setReadOnlyRaw(stored.readOnly ?? false);
     }
     setHydrated(true);
   }, []);
@@ -81,6 +86,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const lock = useCallback(() => {
     setMnemonicRaw(null);
     setPasswordRaw(null);
+    setReadOnlyRaw(false);
     clearStorage();
     router.push("/qr-to-wallet");
   }, [router]);
@@ -93,10 +99,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [mnemonic, lock]);
 
   const setSession = useCallback(
-    (m: string, p: string) => {
+    (m: string, p: string, ro = false) => {
       setMnemonicRaw(m);
       setPasswordRaw(p);
-      saveToStorage(m, p);
+      setReadOnlyRaw(ro);
+      saveToStorage(m, p, ro);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
     },
@@ -128,6 +135,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       value={{
         mnemonic,
         password,
+        readOnly,
         setSession,
         lock,
         isUnlocked: !!mnemonic,

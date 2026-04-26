@@ -13,7 +13,7 @@ const links = [
 
 export default function Nav() {
   const pathname = usePathname();
-  const { isUnlocked, lock } = useSession();
+  const { isUnlocked, readOnly, lock } = useSession();
   const [open, setOpen] = useState(false);
 
   const linkClass = (href: string) =>
@@ -47,18 +47,25 @@ export default function Nav() {
               <Link href="/wallet" className={exactClass("/wallet")}>
                 Wallet
               </Link>
-              <Link
-                href="/wallet/connect"
-                className={exactClass("/wallet/connect")}
-              >
-                Connect
-              </Link>
+              {!readOnly && (
+                <Link
+                  href="/wallet/connect"
+                  className={exactClass("/wallet/connect")}
+                >
+                  Connect
+                </Link>
+              )}
               <Link
                 href="/wallet/settings"
                 className={exactClass("/wallet/settings")}
               >
                 Settings
               </Link>
+              {readOnly && (
+                <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded font-bold">
+                  READ-ONLY
+                </span>
+              )}
               <button
                 onClick={lock}
                 className="ml-2 bg-m-red hover:bg-red-700 text-white text-xs font-bold py-1 px-3 rounded"
@@ -116,13 +123,15 @@ export default function Nav() {
               >
                 Wallet
               </Link>
-              <Link
-                href="/wallet/connect"
-                onClick={() => setOpen(false)}
-                className={exactClass("/wallet/connect")}
-              >
-                Connect
-              </Link>
+              {!readOnly && (
+                <Link
+                  href="/wallet/connect"
+                  onClick={() => setOpen(false)}
+                  className={exactClass("/wallet/connect")}
+                >
+                  Connect
+                </Link>
+              )}
               <Link
                 href="/wallet/settings"
                 onClick={() => setOpen(false)}
@@ -130,6 +139,11 @@ export default function Nav() {
               >
                 Settings
               </Link>
+              {readOnly && (
+                <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-2 py-0.5 rounded font-bold inline-block mt-1">
+                  READ-ONLY
+                </span>
+              )}
               <button
                 onClick={() => {
                   setOpen(false);

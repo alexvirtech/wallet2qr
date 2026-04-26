@@ -23,11 +23,13 @@ export function deriveBitcoinAccount(mnemonic: string, path?: string) {
   return { address, privateKey };
 }
 
+import { rateLimitedFetch } from "./rateLimiter";
+
 export async function getBtcBalance(
   address: string
 ): Promise<{ raw: bigint; formatted: string }> {
   try {
-    const res = await fetch(`https://mempool.space/api/address/${address}`);
+    const res = await rateLimitedFetch(`https://mempool.space/api/address/${address}`);
     if (!res.ok) throw new Error(`Mempool API ${res.status}`);
     const data = await res.json();
     const funded = BigInt(data.chain_stats?.funded_txo_sum ?? 0);

@@ -4,6 +4,7 @@ import { ed25519 } from "@noble/curves/ed25519";
 import { base58 } from "@scure/base";
 import { mnemonicToSeedSync } from "@scure/bip39";
 import type { NetworkConfig, TokenConfig } from "./networks";
+import { rateLimitedFetch } from "./rateLimiter";
 
 const DEFAULT_SOLANA_PATH = "m/44'/501'/0'/0'";
 
@@ -57,7 +58,7 @@ export async function getSolNativeBalance(
   network: NetworkConfig,
   address: string
 ): Promise<{ raw: bigint; formatted: string }> {
-  const res = await fetch(network.rpcUrl, {
+  const res = await rateLimitedFetch(network.rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -78,7 +79,7 @@ export async function getSplTokenBalance(
   ownerAddress: string,
   mintAddress: string,
 ): Promise<{ raw: bigint; formatted: string }> {
-  const res = await fetch(network.rpcUrl, {
+  const res = await rateLimitedFetch(network.rpcUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
