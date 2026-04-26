@@ -7,14 +7,16 @@ import { decryptPayload } from "@/lib/compat/qrPayload";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { useSession } from "@/lib/state/session";
 
+type Mode = "wallet" | "mnemonic";
+
 export default function QrToWalletPage() {
   const [payload, setPayload] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
-  const [mnemonic, setMnemonic] = useState<string | null>(null);
-  const [showMnemonic, setShowMnemonic] = useState(false);
+  const [mode, setMode] = useState<Mode>("wallet");
   const [readOnly, setReadOnly] = useState(false);
+  const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
   const { setSession } = useSession();
   const router = useRouter();
 
@@ -47,22 +49,21 @@ export default function QrToWalletPage() {
       return;
     }
 
-    setMnemonic(decrypted);
-    setDecrypting(false);
-  }, [payload, password]);
-
-  const handleOpenWallet = useCallback(() => {
-    if (!mnemonic) return;
-    setSession(mnemonic, password, readOnly);
-    router.push("/wallet");
-  }, [mnemonic, password, readOnly, setSession, router]);
+    if (mode === "wallet") {
+      setSession(decrypted, password, readOnly);
+      router.push("/wallet");
+    } else {
+      setRevealedMnemonic(decrypted);
+      setDecrypting(false);
+    }
+  }, [payload, password, mode, readOnly, setSession, router]);
 
   const handleReset = useCallback(() => {
     setPayload(null);
     setPassword("");
     setError(null);
-    setMnemonic(null);
-    setShowMnemonic(false);
+    setRevealedMnemonic(null);
+    setMode("wallet");
     setReadOnly(false);
   }, []);
 
@@ -78,56 +79,16 @@ export default function QrToWalletPage() {
           onDecoded={handleDecoded}
           onError={(msg) => setError(msg)}
         />
-      ) : mnemonic ? (
+      ) : revealedMnemonic ? (
         <div className="space-y-4">
-          <div className="bg-m-green/10 border border-m-green/30 rounded-lg p-3 text-sm text-m-green font-bold">
-            Decrypted successfully! Choose what to do next.
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+            <p className="text-xs text-yellow-600 dark:text-yellow-400 font-bold mb-2">
+              Keep this secret — never share your mnemonic!
+            </p>
+            <p className="font-mono text-sm text-gray-800 dark:text-gray-200 break-words select-all">
+              {revealedMnemonic}
+            </p>
           </div>
-
-          {showMnemonic && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 font-bold mb-2">
-                Keep this secret — never share your mnemonic!
-              </p>
-              <p className="font-mono text-sm text-gray-800 dark:text-gray-200 break-words select-all">
-                {mnemonic}
-              </p>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => setShowMnemonic((v) => !v)}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-md text-sm w-full"
-            >
-              {showMnemonic ? "Hide Mnemonic" : "View Mnemonic"}
-            </button>
-
-            <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-              <label className="flex items-center gap-2 cursor-pointer mb-3">
-                <input
-                  type="checkbox"
-                  checked={readOnly}
-                  onChange={(e) => setReadOnly(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
-                <span className="text-sm text-gray-600 dark:text-gray-300">
-                  Read-only mode
-                </span>
-                <span className="text-xs text-gray-400">
-                  (view balances only, no transactions)
-                </span>
-              </label>
-
-              <button
-                onClick={handleOpenWallet}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md text-sm w-full"
-              >
-                Open Wallet
-              </button>
-            </div>
-          </div>
-
           <button
             onClick={handleReset}
             className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 underline"
@@ -154,6 +115,55 @@ export default function QrToWalletPage() {
               onKeyDown={(e) => e.key === "Enter" && handleDecrypt()}
               autoFocus
             />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+              After decryption
+            </p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={mode === "wallet"}
+                  onChange={() => setMode("wallet")}
+                  className="accent-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Open Wallet
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="mode"
+                  checked={mode === "mnemonic"}
+                  onChange={() => setMode("mnemonic")}
+                  className="accent-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  View Mnemonic
+                </span>
+              </label>
+            </div>
+
+            {mode === "wallet" && (
+              <label className="flex items-center gap-2 cursor-pointer ml-6">
+                <input
+                  type="checkbox"
+                  checked={readOnly}
+                  onChange={(e) => setReadOnly(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Read-only mode
+                </span>
+                <span className="text-xs text-gray-400">
+                  (view balances only, no transactions)
+                </span>
+              </label>
+            )}
           </div>
 
           {error && <p className="text-m-red text-sm">{error}</p>}
