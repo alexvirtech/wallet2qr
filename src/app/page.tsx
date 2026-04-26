@@ -106,6 +106,172 @@ function DeepLinkHandler() {
   );
 }
 
+function FlowInfographic() {
+  return (
+    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-2 py-4">
+      {/* Mnemonic */}
+      <div className="flex flex-col items-center gap-2 w-28">
+        <div className="w-16 h-16 rounded-2xl bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="7" y1="9" x2="17" y2="9" />
+            <line x1="7" y1="13" x2="14" y2="13" />
+            <line x1="7" y1="17" x2="11" y2="17" />
+          </svg>
+        </div>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Mnemonic</span>
+      </div>
+
+      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
+        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
+        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
+      </svg>
+
+      {/* Lock / Encrypt */}
+      <div className="flex flex-col items-center gap-2 w-28">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+            <circle cx="12" cy="16" r="1.5" />
+          </svg>
+        </div>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Encrypt</span>
+      </div>
+
+      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
+        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
+        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
+      </svg>
+
+      {/* QR Code */}
+      <div className="flex flex-col items-center gap-2 w-28">
+        <div className="w-16 h-16 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-purple-500">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="3" height="3" rx="0.5" />
+            <rect x="18" y="14" width="3" height="3" rx="0.5" />
+            <rect x="14" y="18" width="3" height="3" rx="0.5" />
+            <rect x="18" y="18" width="3" height="3" rx="0.5" />
+            <rect x="5" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
+            <rect x="16" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
+            <rect x="5" y="16" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
+          </svg>
+        </div>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">QR Code</span>
+      </div>
+
+      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
+        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
+        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
+      </svg>
+
+      {/* Scan */}
+      <div className="flex flex-col items-center gap-2 w-28">
+        <div className="w-16 h-16 rounded-2xl bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+            <rect x="4" y="2" width="16" height="20" rx="3" />
+            <line x1="4" y1="12" x2="20" y2="12" strokeDasharray="2 2" />
+            <rect x="7" y="6" width="4" height="4" rx="0.5" />
+            <rect x="13" y="6" width="4" height="4" rx="0.5" />
+            <rect x="7" y="14" width="4" height="4" rx="0.5" />
+          </svg>
+        </div>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Scan</span>
+      </div>
+
+      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
+        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
+        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
+      </svg>
+
+      {/* Wallet */}
+      <div className="flex flex-col items-center gap-2 w-28">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+            <rect x="2" y="6" width="20" height="14" rx="2" />
+            <path d="M2 10h20" />
+            <circle cx="17" cy="15" r="1.5" />
+            <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
+          </svg>
+        </div>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Wallet</span>
+      </div>
+    </div>
+  );
+}
+
+function SecuritySection() {
+  const checks = [
+    { label: "CodeQL", desc: "Static code analysis", color: "text-blue-500" },
+    { label: "Dependabot", desc: "Dependency monitoring", color: "text-amber-500" },
+    { label: "Scorecard", desc: "Supply-chain security", color: "text-purple-500" },
+    { label: "Manual review", desc: "Crypto flow audit", color: "text-emerald-500" },
+  ];
+
+  return (
+    <section className="pb-12 sm:pb-16">
+      <div className="rounded-2xl border border-blue-200 dark:border-blue-900/50 bg-gradient-to-b from-blue-50/50 to-white dark:from-blue-950/20 dark:to-m-blue-dark-2 overflow-hidden">
+        <div className="p-6 sm:p-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+              <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+              <polyline points="9 12 11 14 15 10" />
+            </svg>
+            <h2 className="text-xl sm:text-2xl font-bold">
+              Security & Transparency
+            </h2>
+          </div>
+
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-xl mx-auto mb-6 leading-relaxed">
+            Wallet2QR follows a <strong className="text-gray-700 dark:text-gray-200">non-custodial</strong> architecture.
+            Your mnemonic, password, and private keys never leave your browser.
+            The public repository uses continuous automated security scanning.
+            A <strong className="text-gray-700 dark:text-gray-200">formal third-party audit</strong> is planned
+            after the core wallet architecture is stabilized.
+          </p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            {checks.map((c) => (
+              <div key={c.label} className="bg-white dark:bg-m-blue-dark-3 rounded-xl p-3 text-center shadow-sm">
+                <div className={`text-sm font-bold ${c.color}`}>{c.label}</div>
+                <div className="text-[11px] text-gray-400 mt-0.5">{c.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+              href="https://github.com/alexvirtech/wallet2qr/blob/main/SECURITY.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 text-sm text-blue-500 hover:text-blue-700 font-bold border border-blue-200 dark:border-blue-800 rounded-lg py-2.5 px-5 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+              </svg>
+              Security policy
+            </a>
+            <a
+              href="https://github.com/alexvirtech/wallet2qr/actions/workflows/codeql.yml"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-bold border border-gray-200 dark:border-gray-700 rounded-lg py-2.5 px-5 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+              </svg>
+              View scan results
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function LandingContent() {
   const searchParams = useSearchParams();
   const ds = searchParams.get("ds");
@@ -128,7 +294,8 @@ function LandingContent() {
           Scan it back anytime to access a lightweight multi-chain wallet —
           no installs, no extensions, no secrets stored.
         </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <FlowInfographic />
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
           <a
             href="/wallet-to-qr"
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-sm"
@@ -177,6 +344,9 @@ function LandingContent() {
         </div>
       </section>
 
+      {/* Security & Audit — central position */}
+      <SecuritySection />
+
       {/* Features */}
       <section className="pb-12 sm:pb-16">
         <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">
@@ -219,33 +389,6 @@ function LandingContent() {
               </p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* Security */}
-      <section className="pb-12 sm:pb-16">
-        <h2 className="text-xl sm:text-2xl font-bold text-center mb-4">
-          Security-First, Non-Custodial Design
-        </h2>
-        <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6">
-          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-            Wallet2QR is under active development and follows a non-custodial
-            architecture: your mnemonic, password, and private keys remain under
-            your control. The public repository uses continuous automated security
-            checks including code scanning, dependency monitoring, and supply-chain
-            security review. A formal third-party audit is planned after the core
-            wallet architecture is stabilized.
-          </p>
-          <div className="mt-4 text-center">
-            <a
-              href="https://github.com/alexvirtech/wallet2qr/blob/main/SECURITY.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block text-sm text-blue-500 hover:text-blue-700 font-bold border border-blue-200 dark:border-blue-800 rounded-lg py-2 px-5 transition-colors"
-            >
-              View security details on GitHub
-            </a>
-          </div>
         </div>
       </section>
     </div>
