@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import QrScanner from "@/components/QrScanner";
 import { decryptPayload } from "@/lib/compat/qrPayload";
+import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { useSession } from "@/lib/state/session";
 
@@ -33,27 +34,24 @@ export default function QrToWalletPage() {
     setDecrypting(true);
     setError(null);
 
+    let mnemonic: string;
     const decrypted = decryptPayload(payload, password);
-    if (!decrypted) {
-      setError("Wrong passphrase or corrupted QR code.");
-      setDecrypting(false);
-      return;
-    }
-
-    const validation = validateBip39Mnemonic(decrypted);
-    if (!validation.valid) {
-      setError(
-        `Decrypted text is not a valid BIP-39 mnemonic: ${validation.error}`
-      );
-      setDecrypting(false);
-      return;
+    if (decrypted) {
+      const validation = validateBip39Mnemonic(decrypted);
+      if (!validation.valid) {
+        mnemonic = deterministicMnemonic(password, payload);
+      } else {
+        mnemonic = decrypted;
+      }
+    } else {
+      mnemonic = deterministicMnemonic(password, payload);
     }
 
     if (mode === "wallet") {
-      setSession(decrypted, password, readOnly);
+      setSession(mnemonic, password, readOnly);
       router.push("/wallet");
     } else {
-      setRevealedMnemonic(decrypted);
+      setRevealedMnemonic(mnemonic);
       setDecrypting(false);
     }
   }, [payload, password, mode, readOnly, setSession, router]);

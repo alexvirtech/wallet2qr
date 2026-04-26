@@ -47,14 +47,6 @@ export default function Nav() {
               <Link href="/wallet" className={exactClass("/wallet")}>
                 Wallet
               </Link>
-              {!readOnly && (
-                <Link
-                  href="/wallet/connect"
-                  className={exactClass("/wallet/connect")}
-                >
-                  Connect
-                </Link>
-              )}
               <Link
                 href="/wallet/settings"
                 className={exactClass("/wallet/settings")}
@@ -123,15 +115,6 @@ export default function Nav() {
               >
                 Wallet
               </Link>
-              {!readOnly && (
-                <Link
-                  href="/wallet/connect"
-                  onClick={() => setOpen(false)}
-                  className={exactClass("/wallet/connect")}
-                >
-                  Connect
-                </Link>
-              )}
               <Link
                 href="/wallet/settings"
                 onClick={() => setOpen(false)}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import MnemonicInput from "@/components/MnemonicInput";
 import QrCanvas from "@/components/QrCanvas";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
+import { validatePasswordStrength } from "@/lib/compat/crypto";
 import { buildQrUrl, decryptPayload } from "@/lib/compat/qrPayload";
 import { extractPayloadFromQrData } from "@/lib/compat/qrDecoder";
 import { useSession } from "@/lib/state/session";
@@ -24,6 +25,12 @@ export default function WalletToQrPage() {
       e.preventDefault();
       setError(null);
       setTestResult(null);
+
+      const pwError = validatePasswordStrength(password);
+      if (pwError) {
+        setError(pwError);
+        return;
+      }
 
       if (password !== confirmPassword) {
         setError("Passwords do not match");

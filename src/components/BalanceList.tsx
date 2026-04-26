@@ -259,9 +259,16 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const items = isProxyEnabled()
-        ? await refreshViaProxy(accounts, getVisibleTokens)
-        : await refreshDirect(accounts, getVisibleTokens);
+      let items: BalanceItem[];
+      if (isProxyEnabled()) {
+        try {
+          items = await refreshViaProxy(accounts, getVisibleTokens);
+        } catch {
+          items = await refreshDirect(accounts, getVisibleTokens);
+        }
+      } else {
+        items = await refreshDirect(accounts, getVisibleTokens);
+      }
 
       setBalances(items);
       const cached = loadCachedBalances();

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { decryptPayload } from "@/lib/compat/qrPayload";
+import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { useSession } from "@/lib/state/session";
 
@@ -13,11 +14,13 @@ function DeepLinkHandler() {
   const { setSession } = useSession();
   const ds = searchParams.get("ds");
   const pw = searchParams.get("pw");
+  const roParam = searchParams.get("readOnly");
 
   const [password, setPassword] = useState(pw ?? "");
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [autoAttempted, setAutoAttempted] = useState(false);
+  const [readOnly, setReadOnly] = useState(roParam === "1");
 
   const handleDecrypt = useCallback((pwd?: string) => {
     const pass = pwd ?? password;
@@ -28,25 +31,18 @@ function DeepLinkHandler() {
     setDecrypting(true);
     setError(null);
 
+    let mnemonic: string;
     const decrypted = decryptPayload(ds, pass);
-    if (!decrypted) {
-      setError("Wrong password or corrupted data.");
-      setDecrypting(false);
-      return;
+    if (decrypted) {
+      const validation = validateBip39Mnemonic(decrypted);
+      mnemonic = validation.valid ? decrypted : deterministicMnemonic(pass, ds);
+    } else {
+      mnemonic = deterministicMnemonic(pass, ds);
     }
 
-    const validation = validateBip39Mnemonic(decrypted);
-    if (!validation.valid) {
-      setError(
-        `Decrypted text is not a valid BIP-39 mnemonic: ${validation.error}`
-      );
-      setDecrypting(false);
-      return;
-    }
-
-    setSession(decrypted, pass);
+    setSession(mnemonic, pass, readOnly);
     router.push("/wallet");
-  }, [ds, password, setSession, router]);
+  }, [ds, password, readOnly, setSession, router]);
 
   useEffect(() => {
     if (ds && pw && !autoAttempted) {
@@ -80,6 +76,21 @@ function DeepLinkHandler() {
             autoFocus
           />
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={readOnly}
+            onChange={(e) => setReadOnly(e.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          <span className="text-sm text-gray-600 dark:text-gray-300">
+            Read-only mode
+          </span>
+          <span className="text-xs text-gray-400">
+            (view balances only)
+          </span>
+        </label>
 
         {error && <p className="text-m-red text-sm">{error}</p>}
 
@@ -208,6 +219,33 @@ function LandingContent() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Security */}
+      <section className="pb-12 sm:pb-16">
+        <h2 className="text-xl sm:text-2xl font-bold text-center mb-4">
+          Security-First, Non-Custodial Design
+        </h2>
+        <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6">
+          <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            Wallet2QR is under active development and follows a non-custodial
+            architecture: your mnemonic, password, and private keys remain under
+            your control. The public repository uses continuous automated security
+            checks including code scanning, dependency monitoring, and supply-chain
+            security review. A formal third-party audit is planned after the core
+            wallet architecture is stabilized.
+          </p>
+          <div className="mt-4 text-center">
+            <a
+              href="https://github.com/alexvirtech/wallet2qr/blob/main/SECURITY.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-sm text-blue-500 hover:text-blue-700 font-bold border border-blue-200 dark:border-blue-800 rounded-lg py-2 px-5 transition-colors"
+            >
+              View security details on GitHub
+            </a>
+          </div>
         </div>
       </section>
     </div>
