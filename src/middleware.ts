@@ -7,16 +7,14 @@ export function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   if (isAdmin) {
+    if (path.startsWith("/api/auth")) {
+      return NextResponse.next();
+    }
     const mainDomain = hostname.replace(/^admin\./, "");
     const url = req.nextUrl.clone();
     url.host = mainDomain;
     url.pathname = `/admin${path === "/" ? "" : path}`;
     return NextResponse.redirect(url);
-  }
-
-  // Allow /admin on main domain too (auth is enforced by the layout)
-  if (path.startsWith("/admin")) {
-    return NextResponse.next();
   }
 
   return NextResponse.next();

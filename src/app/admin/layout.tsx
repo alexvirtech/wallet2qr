@@ -1,5 +1,4 @@
-import { auth, signOut } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import { auth, signIn, signOut } from "@/lib/auth";
 
 export const metadata = { title: "wallet2qr Admin" };
 
@@ -7,7 +6,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await auth();
 
   if (!session?.user) {
-    redirect("/api/auth/signin?callbackUrl=/admin");
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2 text-gray-900 dark:text-gray-100">wallet2qr Admin</h1>
+          <p className="text-gray-500 mb-6 text-sm">Sign in to access the admin dashboard</p>
+          <form
+            action={async () => {
+              "use server";
+              await signIn("google", { redirectTo: "/admin" });
+            }}
+          >
+            <button
+              type="submit"
+              className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-6 py-2.5 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
+            >
+              Sign in with Google
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -20,7 +39,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <form
               action={async () => {
                 "use server";
-                await signOut({ redirectTo: "/api/auth/signin" });
+                await signOut({ redirectTo: "/admin" });
               }}
             >
               <button
