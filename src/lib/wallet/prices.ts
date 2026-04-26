@@ -1,4 +1,5 @@
 const CACHE_TTL = 60_000;
+const LS_KEY = "w2q_prices";
 
 interface PriceCache {
   prices: Record<string, number>;
@@ -6,6 +7,22 @@ interface PriceCache {
 }
 
 let cache: PriceCache | null = null;
+
+function loadCachedPrices(): PriceCache | null {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedPrices(c: PriceCache) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(c));
+  } catch {}
+}
 
 const COINGECKO_IDS = [
   "ethereum",
@@ -39,6 +56,16 @@ export async function fetchPrices(): Promise<Record<string, number>> {
     return cache.prices;
   }
 
+  if (!cache && typeof window !== "undefined") {
+    const stored = loadCachedPrices();
+    if (stored) {
+      cache = stored;
+      if (Date.now() - stored.timestamp < CACHE_TTL) {
+        return stored.prices;
+      }
+    }
+  }
+
   try {
     const ids = COINGECKO_IDS.join(",");
     const res = await fetch(
@@ -69,6 +96,7 @@ export async function fetchPrices(): Promise<Record<string, number>> {
     };
 
     cache = { prices, timestamp: Date.now() };
+    if (typeof window !== "undefined") saveCachedPrices(cache);
     return prices;
   } catch {
     return cache?.prices ?? { ...defaultPrices };

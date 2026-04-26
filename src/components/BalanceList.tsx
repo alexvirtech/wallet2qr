@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { type NetworkConfig } from "@/lib/wallet/networks";
+import { type NetworkConfig, allNetworks } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
 import { getSolNativeBalance, getSplTokenBalance } from "@/lib/wallet/solana";
 import { getBtcBalance } from "@/lib/wallet/bitcoin";
@@ -12,22 +12,30 @@ import { getAssetsForNetwork, type AssetCategory } from "@/lib/wallet/assets";
 import TokenIcon from "@/components/TokenIcon";
 import type { Address } from "viem";
 
-interface BalanceItem {
+export interface BalanceItem {
   symbol: string;
   name: string;
   balance: string;
+  rawBalance: number;
   usdValue: string;
   usdNum: number;
   category: AssetCategory;
   address: string;
   tokenType: "native" | "token";
+  networkKey: string;
+  networkName: string;
+}
+
+interface NetworkAccount {
+  network: NetworkConfig;
+  address: string;
+  networkKey: string;
 }
 
 interface BalanceListProps {
-  network: NetworkConfig;
-  address: string;
-  showTotalUsd?: boolean;
-  networkKey: string;
+  accounts: NetworkAccount[];
+  hideZero: boolean;
+  onTotalChange?: (total: number) => void;
 }
 
 const BORDER_COLORS: Record<AssetCategory, string> = {
@@ -44,100 +52,157 @@ const CATEGORY_LABELS: Record<AssetCategory, string> = {
   ecosystem: "Eco",
 };
 
-export default function BalanceList({ network, address, showTotalUsd, networkKey }: BalanceListProps) {
+const LS_BALANCES_KEY = "w2q_balances";
+const REFRESH_INTERVAL = 60_000;
+
+function loadCachedBalances(): Record<string, BalanceItem[]> {
+  try {
+    const raw = localStorage.getItem(LS_BALANCES_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveCachedBalances(data: Record<string, BalanceItem[]>) {
+  try {
+    localStorage.setItem(LS_BALANCES_KEY, JSON.stringify(data));
+  } catch {}
+}
+
+function cacheKey(accounts: NetworkAccount[]): string {
+  return accounts.map((a) => `${a.networkKey}:${a.address}`).join("|");
+}
+
+export default function BalanceList({ accounts, hideZero, onTotalChange }: BalanceListProps) {
   const [balances, setBalances] = useState<BalanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<BalanceItem | null>(null);
   const { getVisibleTokens, getDerivationPath } = useSettings();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const accountsRef = useRef(cacheKey(accounts));
 
-  const expectedCount = getVisibleTokens(networkKey).length;
-  const prevKeyRef = useRef(networkKey);
+  const expectedCount = accounts.reduce(
+    (sum, a) => sum + getVisibleTokens(a.networkKey).length,
+    0
+  );
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
-      const visibleSymbols = getVisibleTokens(networkKey);
       const prices = await fetchPrices();
-      const assetDefs = getAssetsForNetwork(network.key);
-
       const items: BalanceItem[] = [];
 
-      if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
-        let nativeBal: { formatted: string };
-        if (network.chainType === "bitcoin") {
-          nativeBal = await getBtcBalance(address);
-        } else if (network.chainType === "solana") {
-          nativeBal = await getSolNativeBalance(network, address);
-        } else {
-          nativeBal = await getNativeBalance(network, address as Address);
-        }
-        const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
-        const nativeUsd = parseFloat(nativeBal.formatted) * nativePrice;
-        const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
-        items.push({
-          symbol: network.nativeCurrency.symbol,
-          name: network.nativeCurrency.name,
-          balance: formatBalance(nativeBal.formatted),
-          usdValue: formatUsd(nativeUsd),
-          usdNum: nativeUsd,
-          category: nativeDef?.category ?? "gas",
-          address: "",
-          tokenType: "native",
-        });
-      }
+      for (const { network, address, networkKey } of accounts) {
+        const visibleSymbols = getVisibleTokens(networkKey);
+        const assetDefs = getAssetsForNetwork(network.key);
 
-      for (const token of network.tokens) {
-        if (!visibleSymbols.includes(token.symbol)) continue;
-        let bal: { formatted: string };
-        if (network.chainType === "solana") {
-          bal = await getSplTokenBalance(network, address, token.address);
-        } else {
-          bal = await getTokenBalance(
-            network,
-            token.address as Address,
-            address as Address,
-            token.decimals
-          );
+        if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
+          let nativeBal: { formatted: string };
+          if (network.chainType === "bitcoin") {
+            nativeBal = await getBtcBalance(address);
+          } else if (network.chainType === "solana") {
+            nativeBal = await getSolNativeBalance(network, address);
+          } else {
+            nativeBal = await getNativeBalance(network, address as Address);
+          }
+          const raw = parseFloat(nativeBal.formatted);
+          const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
+          const nativeUsd = raw * nativePrice;
+          const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
+          items.push({
+            symbol: network.nativeCurrency.symbol,
+            name: network.nativeCurrency.name,
+            balance: formatBalance(nativeBal.formatted),
+            rawBalance: raw,
+            usdValue: formatUsd(nativeUsd),
+            usdNum: nativeUsd,
+            category: nativeDef?.category ?? "gas",
+            address: "",
+            tokenType: "native",
+            networkKey,
+            networkName: network.name,
+          });
         }
-        const price = prices[token.symbol] ?? 0;
-        const usd = parseFloat(bal.formatted) * price;
-        const def = assetDefs.find((a) => a.symbol === token.symbol);
-        items.push({
-          symbol: token.symbol,
-          name: token.name,
-          balance: formatBalance(bal.formatted),
-          usdValue: formatUsd(usd),
-          usdNum: usd,
-          category: def?.category ?? "ecosystem",
-          address: token.address,
-          tokenType: "token",
-        });
+
+        for (const token of network.tokens) {
+          if (!visibleSymbols.includes(token.symbol)) continue;
+          let bal: { formatted: string };
+          if (network.chainType === "solana") {
+            bal = await getSplTokenBalance(network, address, token.address);
+          } else {
+            bal = await getTokenBalance(
+              network,
+              token.address as Address,
+              address as Address,
+              token.decimals
+            );
+          }
+          const raw = parseFloat(bal.formatted);
+          const price = prices[token.symbol] ?? 0;
+          const usd = raw * price;
+          const def = assetDefs.find((a) => a.symbol === token.symbol);
+          items.push({
+            symbol: token.symbol,
+            name: token.name,
+            balance: formatBalance(bal.formatted),
+            rawBalance: raw,
+            usdValue: formatUsd(usd),
+            usdNum: usd,
+            category: def?.category ?? "ecosystem",
+            address: token.address,
+            tokenType: "token",
+            networkKey,
+            networkName: network.name,
+          });
+        }
       }
 
       setBalances(items);
+      const cached = loadCachedBalances();
+      cached[cacheKey(accounts)] = items;
+      saveCachedBalances(cached);
     } catch (e) {
       setError("Failed to load balances");
       console.error(e);
     } finally {
       setLoading(false);
     }
-  }, [network, address, networkKey, getVisibleTokens]);
+  }, [accounts, getVisibleTokens]);
 
   useEffect(() => {
+    const key = cacheKey(accounts);
+    if (accountsRef.current !== key) {
+      accountsRef.current = key;
+      const cached = loadCachedBalances();
+      if (cached[key]) {
+        setBalances(cached[key]);
+        setLoading(false);
+      } else {
+        setBalances([]);
+        setLoading(true);
+      }
+    }
     refresh();
   }, [refresh]);
 
   useEffect(() => {
-    if (prevKeyRef.current !== networkKey) {
-      prevKeyRef.current = networkKey;
-      setBalances([]);
-    }
-  }, [networkKey]);
+    intervalRef.current = setInterval(() => refresh(true), REFRESH_INTERVAL);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [refresh]);
 
+  const filtered = hideZero ? balances.filter((b) => b.rawBalance > 0) : balances;
   const totalUsd = balances.reduce((sum, b) => sum + b.usdNum, 0);
-  const derivationPath = getDerivationPath(networkKey);
+  const isMultiNetwork = accounts.length > 1;
+
+  useEffect(() => {
+    onTotalChange?.(totalUsd);
+  }, [totalUsd, onTotalChange]);
 
   return (
     <div>
@@ -146,7 +211,7 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
           Assets
         </h3>
         <button
-          onClick={refresh}
+          onClick={() => refresh()}
           disabled={loading}
           className="text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50"
         >
@@ -154,20 +219,10 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
         </button>
       </div>
 
-      {showTotalUsd && (
-        <div className="h-9 mb-3 flex items-center">
-          {loading ? (
-            <div className="h-7 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          ) : (
-            <span className="text-2xl font-bold">{formatUsd(totalUsd)}</span>
-          )}
-        </div>
-      )}
-
-      {error && <p className="text-m-red text-xs mb-2">{error}</p>}
+      {error && <p className="text-red-500 text-xs mb-2">{error}</p>}
 
       <div className="space-y-2">
-        {loading
+        {loading && balances.length === 0
           ? Array.from({ length: Math.max(expectedCount, 2) }).map((_, i) => (
               <div
                 key={i}
@@ -184,23 +239,30 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
                 </div>
               </div>
             ))
-          : balances.length === 0 && !error
+          : filtered.length === 0 && !error
             ? (
-              <p className="text-xs text-gray-400">No visible assets. Check Settings.</p>
+              <p className="text-xs text-gray-400">
+                {hideZero ? "No assets with balance." : "No visible assets. Check Settings."}
+              </p>
             )
-            : balances.map((b) => (
+            : filtered.map((b) => (
               <button
-                key={b.symbol}
+                key={`${b.networkKey}:${b.symbol}`}
                 onClick={() => setSelectedAsset(b)}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg border-l-4 ${BORDER_COLORS[b.category]} bg-white dark:bg-m-blue-dark-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer text-left h-[68px]`}
               >
-                <TokenIcon symbol={b.symbol} category={b.category} networkKey={networkKey} tokenAddress={b.address} />
+                <TokenIcon symbol={b.symbol} category={b.category} networkKey={b.networkKey} tokenAddress={b.address} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-sm">{b.symbol}</span>
                     <span className="text-xs text-gray-400 truncate">{b.name}</span>
                   </div>
-                  <span className="text-[10px] text-gray-400">{CATEGORY_LABELS[b.category]}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-gray-400">{CATEGORY_LABELS[b.category]}</span>
+                    {isMultiNetwork && (
+                      <span className="text-[10px] text-gray-400 truncate">{b.networkName}</span>
+                    )}
+                  </div>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <div className="text-sm font-bold font-mono">{b.balance}</div>
@@ -214,12 +276,12 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
       {selectedAsset && (
         <AssetDetailModal
           asset={selectedAsset}
-          networkName={network.name}
-          blockExplorer={network.blockExplorer}
-          walletAddress={address}
-          derivationPath={derivationPath}
-          chainType={network.chainType}
-          networkKey={networkKey}
+          networkName={selectedAsset.networkName}
+          blockExplorer={allNetworks[selectedAsset.networkKey]?.blockExplorer ?? ""}
+          walletAddress={accounts.find((a) => a.networkKey === selectedAsset.networkKey)?.address ?? ""}
+          derivationPath={getDerivationPath(selectedAsset.networkKey)}
+          chainType={allNetworks[selectedAsset.networkKey]?.chainType ?? "evm"}
+          networkKey={selectedAsset.networkKey}
           onClose={() => setSelectedAsset(null)}
         />
       )}
