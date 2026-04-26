@@ -3,6 +3,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import { SessionProvider } from "@/lib/state/session";
 import { SettingsProvider } from "@/lib/wallet/settings";
+import { WalletConnectProvider } from "@/components/WalletConnectProvider";
 
 export const metadata: Metadata = {
   title: "wallet2qr — Your crypto wallet, sealed in a QR code",
@@ -27,6 +28,7 @@ export default function RootLayout({
       <body>
         <SessionProvider>
           <SettingsProvider>
+            <WalletConnectProvider>
             <div className="min-h-screen flex flex-col">
               <Nav />
               <main className="flex-1">{children}</main>
@@ -34,6 +36,7 @@ export default function RootLayout({
                 &copy; {new Date().getFullYear()} wallet2qr. All rights reserved.
               </footer>
             </div>
+            </WalletConnectProvider>
           </SettingsProvider>
         </SessionProvider>
       </body>

@@ -9,6 +9,7 @@ import { getBtcBalance } from "@/lib/wallet/bitcoin";
 import { fetchPrices } from "@/lib/wallet/prices";
 import { useSettings } from "@/lib/wallet/settings";
 import { getAssetsForNetwork, type AssetCategory } from "@/lib/wallet/assets";
+import TokenIcon from "@/components/TokenIcon";
 import type { Address } from "viem";
 
 interface BalanceItem {
@@ -34,13 +35,6 @@ const BORDER_COLORS: Record<AssetCategory, string> = {
   stablecoin: "border-l-green-500",
   defi: "border-l-purple-500",
   ecosystem: "border-l-blue-500",
-};
-
-const AVATAR_COLORS: Record<AssetCategory, string> = {
-  gas: "bg-orange-500",
-  stablecoin: "bg-green-500",
-  defi: "bg-purple-500",
-  ecosystem: "bg-blue-500",
 };
 
 const CATEGORY_LABELS: Record<AssetCategory, string> = {
@@ -200,9 +194,7 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
                 onClick={() => setSelectedAsset(b)}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg border-l-4 ${BORDER_COLORS[b.category]} bg-white dark:bg-m-blue-dark-3 shadow-sm hover:shadow-md transition-shadow cursor-pointer text-left h-[68px]`}
               >
-                <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[b.category]} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                  {b.symbol[0]}
-                </div>
+                <TokenIcon symbol={b.symbol} category={b.category} networkKey={networkKey} tokenAddress={b.address} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-sm">{b.symbol}</span>
@@ -227,6 +219,7 @@ export default function BalanceList({ network, address, showTotalUsd, networkKey
           walletAddress={address}
           derivationPath={derivationPath}
           chainType={network.chainType}
+          networkKey={networkKey}
           onClose={() => setSelectedAsset(null)}
         />
       )}
@@ -241,6 +234,7 @@ function AssetDetailModal({
   walletAddress,
   derivationPath,
   chainType,
+  networkKey,
   onClose,
 }: {
   asset: BalanceItem;
@@ -249,6 +243,7 @@ function AssetDetailModal({
   walletAddress: string;
   derivationPath: string;
   chainType: string;
+  networkKey: string;
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -281,9 +276,7 @@ function AssetDetailModal({
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full ${AVATAR_COLORS[asset.category]} flex items-center justify-center text-white font-bold`}>
-              {asset.symbol[0]}
-            </div>
+            <TokenIcon symbol={asset.symbol} category={asset.category} networkKey={networkKey} tokenAddress={asset.address} size={40} />
             <div>
               <span className="font-bold text-lg">{asset.symbol}</span>
               <span className="text-sm text-gray-400 ml-2">{asset.name}</span>

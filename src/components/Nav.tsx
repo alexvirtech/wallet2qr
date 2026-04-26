@@ -48,6 +48,12 @@ export default function Nav() {
                 Wallet
               </Link>
               <Link
+                href="/wallet/connect"
+                className={exactClass("/wallet/connect")}
+              >
+                Connect
+              </Link>
+              <Link
                 href="/wallet/settings"
                 className={exactClass("/wallet/settings")}
               >
@@ -109,6 +115,13 @@ export default function Nav() {
                 className={exactClass("/wallet")}
               >
                 Wallet
+              </Link>
+              <Link
+                href="/wallet/connect"
+                onClick={() => setOpen(false)}
+                className={exactClass("/wallet/connect")}
+              >
+                Connect
               </Link>
               <Link
                 href="/wallet/settings"
