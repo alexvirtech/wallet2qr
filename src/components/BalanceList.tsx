@@ -268,7 +268,8 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
       cached[cacheKeyFor(accounts)] = items;
       saveCachedBalances(cached);
     } catch (e) {
-      setError("Failed to load balances");
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      setError(`Failed to load balances: ${msg}`);
       console.error(e);
     } finally {
       setLoading(false);

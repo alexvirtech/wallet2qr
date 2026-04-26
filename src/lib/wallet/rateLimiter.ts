@@ -1,4 +1,4 @@
-const MAX_REQUESTS = 20;
+const MAX_REQUESTS = 60;
 const WINDOW_MS = 60_000;
 
 let count = 0;
