@@ -157,12 +157,23 @@ async function refreshViaProxy(
   return items;
 }
 
+interface BalanceTask {
+  symbol: string;
+  name: string;
+  category: AssetCategory;
+  tokenAddress: string;
+  tokenType: "native" | "token";
+  networkKey: string;
+  networkName: string;
+  decimals: number;
+  fetch: () => Promise<{ formatted: string }>;
+}
+
 async function refreshDirect(
   accounts: NetworkAccount[],
   getVisibleTokens: (key: string) => string[],
 ): Promise<BalanceItem[]> {
-  const prices = await fetchPrices();
-  const items: BalanceItem[] = [];
+  const tasks: BalanceTask[] = [];
 
   for (const { network, address, networkKey } of accounts) {
     const visibleSymbols = getVisibleTokens(networkKey);
@@ -170,68 +181,74 @@ async function refreshDirect(
     const nativeDecimals = network.nativeCurrency.decimals === 8 ? 8 : 4;
 
     if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
-      let nativeBal: { formatted: string };
-      if (network.chainType === "bitcoin") {
-        nativeBal = await getBtcBalance(address);
-      } else if (network.chainType === "dogecoin") {
-        nativeBal = await getDogeBalance(address);
-      } else if (network.chainType === "zcash") {
-        nativeBal = await getZecBalance(address);
-      } else if (network.chainType === "solana") {
-        nativeBal = await getSolNativeBalance(network, address);
-      } else {
-        nativeBal = await getNativeBalance(network, address as Address);
-      }
-      const raw = parseFloat(nativeBal.formatted);
-      const nativePrice = prices[network.nativeCurrency.symbol] ?? 0;
-      const nativeUsd = raw * nativePrice;
       const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
-      items.push({
+      tasks.push({
         symbol: network.nativeCurrency.symbol,
         name: network.nativeCurrency.name,
-        balance: formatBalance(nativeBal.formatted, nativeDecimals),
-        rawBalance: raw,
-        usdValue: formatUsd(nativeUsd),
-        usdNum: nativeUsd,
         category: nativeDef?.category ?? "gas",
-        address: "",
+        tokenAddress: "",
         tokenType: "native",
         networkKey,
         networkName: network.name,
+        decimals: nativeDecimals,
+        fetch: () => {
+          if (network.chainType === "bitcoin") return getBtcBalance(address);
+          if (network.chainType === "dogecoin") return getDogeBalance(address);
+          if (network.chainType === "zcash") return getZecBalance(address);
+          if (network.chainType === "solana") return getSolNativeBalance(network, address);
+          return getNativeBalance(network, address as Address);
+        },
       });
     }
 
     for (const token of network.tokens) {
       if (!visibleSymbols.includes(token.symbol)) continue;
-      let bal: { formatted: string };
-      if (network.chainType === "solana") {
-        bal = await getSplTokenBalance(network, address, token.address);
-      } else {
-        bal = await getTokenBalance(
-          network,
-          token.address as Address,
-          address as Address,
-          token.decimals
-        );
-      }
-      const raw = parseFloat(bal.formatted);
-      const price = prices[token.symbol] ?? 0;
-      const usd = raw * price;
       const def = assetDefs.find((a) => a.symbol === token.symbol);
-      items.push({
+      tasks.push({
         symbol: token.symbol,
         name: token.name,
-        balance: formatBalance(bal.formatted),
-        rawBalance: raw,
-        usdValue: formatUsd(usd),
-        usdNum: usd,
         category: def?.category ?? "ecosystem",
-        address: token.address,
+        tokenAddress: token.address,
         tokenType: "token",
         networkKey,
         networkName: network.name,
+        decimals: 4,
+        fetch: () => {
+          if (network.chainType === "solana") return getSplTokenBalance(network, address, token.address);
+          return getTokenBalance(network, token.address as Address, address as Address, token.decimals);
+        },
       });
     }
+  }
+
+  const [priceResult, ...balanceResults] = await Promise.allSettled([
+    fetchPrices(),
+    ...tasks.map((t) => t.fetch()),
+  ]);
+
+  const prices = priceResult.status === "fulfilled" ? priceResult.value : {};
+  const items: BalanceItem[] = [];
+
+  for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
+    const result = balanceResults[i];
+    const formatted = result.status === "fulfilled" ? result.value.formatted : "0";
+    const raw = parseFloat(formatted);
+    const price = prices[task.symbol] ?? 0;
+    const usd = raw * price;
+    items.push({
+      symbol: task.symbol,
+      name: task.name,
+      balance: formatBalance(formatted, task.decimals),
+      rawBalance: raw,
+      usdValue: formatUsd(usd),
+      usdNum: usd,
+      category: task.category,
+      address: task.tokenAddress,
+      tokenType: task.tokenType,
+      networkKey: task.networkKey,
+      networkName: task.networkName,
+    });
   }
 
   return items;
