@@ -3,18 +3,27 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { decryptPayload } from "@/lib/compat/qrPayload";
+import { useSession as useAuthSession, signIn as authSignIn } from "next-auth/react";
+import { decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
+import { fetchPepper } from "@/lib/compat/fetchPepper";
 import { useSession } from "@/lib/state/session";
 
 function DeepLinkHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setSession } = useSession();
+  const { data: authSession, status: authStatus } = useAuthSession();
   const ds = searchParams.get("ds");
   const pw = searchParams.get("pw");
   const roParam = searchParams.get("readOnly");
+  const v = searchParams.get("v");
+  const pep = searchParams.get("pep");
+
+  const isV2 = v === "2";
+  const isSignedIn = authStatus === "authenticated";
+  const providerName = pep === "apple" ? "Apple" : "Google";
 
   const [password, setPassword] = useState(pw ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -22,36 +31,66 @@ function DeepLinkHandler() {
   const [autoAttempted, setAutoAttempted] = useState(false);
   const [readOnly, setReadOnly] = useState(roParam === "1");
 
-  const handleDecrypt = useCallback((pwd?: string) => {
+  const handleDecrypt = useCallback(async (pwd?: string) => {
     const pass = pwd ?? password;
     if (!ds || !pass) {
       setError("Enter your password to decrypt.");
       return;
     }
+    if (isV2 && !isSignedIn) {
+      setError("Please sign in first.");
+      return;
+    }
     setDecrypting(true);
     setError(null);
 
-    let mnemonic: string;
-    const decrypted = decryptPayload(ds, pass);
-    if (decrypted) {
-      const validation = validateBip39Mnemonic(decrypted);
-      mnemonic = validation.valid ? decrypted : deterministicMnemonic(pass, ds);
-    } else {
-      mnemonic = deterministicMnemonic(pass, ds);
-    }
+    try {
+      let mnemonic: string;
 
-    setSession(mnemonic, pass, readOnly);
-    router.push("/wallet");
-  }, [ds, password, readOnly, setSession, router]);
+      if (isV2 && isSignedIn) {
+        const { pepper } = await fetchPepper();
+        const decrypted = decryptPayloadV2(ds, pass, pepper);
+        if (decrypted) {
+          const validation = validateBip39Mnemonic(decrypted);
+          if (!validation.valid) {
+            setError("Decryption produced invalid data — wrong password or wrong account.");
+            setDecrypting(false);
+            return;
+          }
+          mnemonic = decrypted;
+        } else {
+          setError("Decryption failed — wrong password or wrong account.");
+          setDecrypting(false);
+          return;
+        }
+      } else {
+        const decrypted = decryptPayload(ds, pass);
+        if (decrypted) {
+          const validation = validateBip39Mnemonic(decrypted);
+          mnemonic = validation.valid ? decrypted : deterministicMnemonic(pass, ds);
+        } else {
+          mnemonic = deterministicMnemonic(pass, ds);
+        }
+      }
+
+      setSession(mnemonic, pass, readOnly);
+      router.push("/wallet");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Decryption failed");
+      setDecrypting(false);
+    }
+  }, [ds, password, readOnly, isV2, isSignedIn, setSession, router]);
 
   useEffect(() => {
-    if (ds && pw && !autoAttempted) {
+    if (ds && pw && !autoAttempted && !isV2) {
       setAutoAttempted(true);
       handleDecrypt(pw);
     }
-  }, [ds, pw, autoAttempted, handleDecrypt]);
+  }, [ds, pw, autoAttempted, isV2, handleDecrypt]);
 
   if (!ds) return null;
+
+  const canDecrypt = !decrypting && (!isV2 || isSignedIn);
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-12">
@@ -61,6 +100,33 @@ function DeepLinkHandler() {
           An encrypted wallet was detected in this link. Enter your password to
           decrypt and open it.
         </p>
+
+        {isV2 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
+            <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+              This wallet is bound to a {providerName} account.
+            </p>
+            {!isSignedIn && (
+              <div className="space-y-1">
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  Sign in with the original account to decrypt.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => authSignIn("google", { callbackUrl: window.location.href })}
+                  className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300 py-1 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Sign in with {providerName}
+                </button>
+              </div>
+            )}
+            {isSignedIn && (
+              <p className="text-xs text-m-green">
+                Signed in as {authSession?.user?.email}
+              </p>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
@@ -72,7 +138,7 @@ function DeepLinkHandler() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password to decrypt"
             className="mt-1 px-3 py-2 border border-gray-300 rounded-lg w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-            onKeyDown={(e) => { if (e.key === "Enter") handleDecrypt(); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && canDecrypt) handleDecrypt(); }}
             autoFocus
           />
         </div>
@@ -96,7 +162,7 @@ function DeepLinkHandler() {
 
         <button
           onClick={() => handleDecrypt()}
-          disabled={decrypting}
+          disabled={!canDecrypt}
           className="w-full bg-m-green hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg text-sm disabled:opacity-50"
         >
           {decrypting ? "Decrypting..." : "Decrypt & Open Wallet"}
