@@ -4,6 +4,7 @@ import Nav from "@/components/Nav";
 import { SessionProvider } from "@/lib/state/session";
 import { SettingsProvider } from "@/lib/wallet/settings";
 import { WalletConnectProvider } from "@/components/WalletConnectProvider";
+import { AuthProvider } from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
   title: "wallet2qr — Your crypto wallet, sealed in a QR code",
@@ -26,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <AuthProvider>
         <SessionProvider>
           <SettingsProvider>
             <WalletConnectProvider>
@@ -39,6 +41,7 @@ export default function RootLayout({
             </WalletConnectProvider>
           </SettingsProvider>
         </SessionProvider>
+        </AuthProvider>
       </body>
     </html>
   );

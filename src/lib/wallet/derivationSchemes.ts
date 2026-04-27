@@ -16,6 +16,10 @@ export const DERIVATION_SCHEMES: DerivationScheme[] = [
   { id: "bip44-btc", name: "BIP-44 Legacy", template: "m/44'/0'/0'/0/{i}", chainTypes: ["bitcoin"] },
   { id: "solana-standard", name: "Phantom / Solflare", template: "m/44'/501'/{i}'/0'", chainTypes: ["solana"] },
   { id: "solana-bip44", name: "Solana BIP-44", template: "m/44'/501'/{i}'/0/0", chainTypes: ["solana"] },
+  { id: "bip44-doge", name: "BIP-44 Dogecoin", template: "m/44'/3'/0'/0/{i}", chainTypes: ["dogecoin"] },
+  { id: "bip44-doge-account", name: "BIP-44 Dogecoin Account-level", template: "m/44'/3'/{i}'/0/0", chainTypes: ["dogecoin"] },
+  { id: "bip44-zcash", name: "BIP-44 Zcash", template: "m/44'/133'/0'/0/{i}", chainTypes: ["zcash"] },
+  { id: "bip44-zcash-account", name: "BIP-44 Zcash Account-level", template: "m/44'/133'/{i}'/0/0", chainTypes: ["zcash"] },
 ];
 
 export function getSchemesForChainType(chainType: ChainType): DerivationScheme[] {
@@ -33,6 +37,8 @@ export function resolveTemplate(template: string, index: number): string {
 export function getDefaultSchemeId(chainType: ChainType): string {
   if (chainType === "bitcoin") return "bip84-segwit";
   if (chainType === "solana") return "solana-standard";
+  if (chainType === "dogecoin") return "bip44-doge";
+  if (chainType === "zcash") return "bip44-zcash";
   return "bip44-standard";
 }
 

@@ -1,8 +1,13 @@
 import jsQR from "jsqr";
 
-// Extract the encrypted payload from a QR code URL string
+// Extract the encrypted payload (ds param only) from a QR code URL string
 export function extractPayloadFromQrData(data: string): string {
-  return data.replace(/^https?:\/\/[^/]+\/\?ds=/, "");
+  try {
+    const u = new URL(data);
+    return u.searchParams.get("ds") ?? data.replace(/^https?:\/\/[^/]+\/\?ds=/, "");
+  } catch {
+    return data.replace(/^https?:\/\/[^/]+\/\?ds=/, "");
+  }
 }
 
 // Decode a QR code from an image element, return the raw QR string

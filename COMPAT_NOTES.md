@@ -73,3 +73,29 @@ const ciphertext = `${getHost()}/?ds=${encrypt(text, password)}`
 const data = qrCode.data.replace(/^https?:\/\/[^/]+\/\?ds=/, "")
 // Then: decrypt(data, password)
 ```
+
+## v2 Envelope — Account-Bound QRs (premium pepper)
+
+v1 QR URLs have a single query parameter:
+
+```
+https://www.wallet2qr.com/?ds=<urlencoded-openssl-ciphertext>
+```
+
+v2 QR URLs add three parameters:
+
+```
+https://www.wallet2qr.com/?ds=<urlencoded-openssl-ciphertext>&v=2&pep=google&sh=<sub-hash>
+```
+
+| Param | Description |
+|-------|-------------|
+| `v=2` | Envelope version — decrypt code branches on this |
+| `pep` | Provider that generated the pepper (`google` or `apple`) |
+| `sh`  | base64url(sha256(sub)) truncated to 16 bytes (22 chars) — UX hint only, not a security claim |
+
+**Cryptographic difference:** v2 QRs use `password + ":" + pepper` as the combined secret fed to the same AES-256-CBC path. The pepper is derived server-side via `HKDF-SHA256(ikm=WALLET2QR_PEPPER_MASTER, salt="wallet2qr-pep-v1", info=provider+"|"+sub, L=32)`. The pepper is deterministic per `(provider, sub)` pair — same account always produces the same pepper.
+
+**Backward compatibility:** v1 QRs are unaffected. `encrypt()` and `decrypt()` in `crypto.ts` are never modified. `encryptV2()` and `decryptV2()` are thin wrappers that call the original functions with the combined secret.
+
+**Pepper rotation hazard:** Rotating `WALLET2QR_PEPPER_MASTER` bricks every v2 QR ever created. There is no migration path. Document this prominently wherever the env var is referenced.

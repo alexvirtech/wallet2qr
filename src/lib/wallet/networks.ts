@@ -1,4 +1,4 @@
-export type ChainType = "evm" | "solana" | "bitcoin";
+export type ChainType = "evm" | "solana" | "bitcoin" | "dogecoin" | "zcash";
 
 export interface NetworkConfig {
   key: string;
@@ -128,6 +128,30 @@ export const allNetworks: Record<string, NetworkConfig> = {
     blockExplorer: "https://mempool.space",
     derivationPath: "m/84'/0'/0'/0/0",
     isDefault: true,
+    tokens: [],
+  },
+  dogecoin: {
+    key: "dogecoin",
+    name: "Dogecoin",
+    chainId: 0,
+    chainType: "dogecoin",
+    nativeCurrency: { name: "Dogecoin", symbol: "DOGE", decimals: 8 },
+    rpcUrl: "",
+    blockExplorer: "https://blockchair.com/dogecoin",
+    derivationPath: "m/44'/3'/0'/0/0",
+    isDefault: false,
+    tokens: [],
+  },
+  zcash: {
+    key: "zcash",
+    name: "Zcash",
+    chainId: 0,
+    chainType: "zcash",
+    nativeCurrency: { name: "Zcash", symbol: "ZEC", decimals: 8 },
+    rpcUrl: "",
+    blockExplorer: "https://blockchair.com/zcash",
+    derivationPath: "m/44'/133'/0'/0/0",
+    isDefault: false,
     tokens: [],
   },
 };

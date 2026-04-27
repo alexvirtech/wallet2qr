@@ -473,6 +473,44 @@ export const assetRegistry: AssetDefinition[] = [
     swapSupported: false,
     bridgeSupported: false,
   },
+
+  // ── Dogecoin ──
+  {
+    assetId: "dogecoin:DOGE",
+    symbol: "DOGE",
+    displayName: "Dogecoin",
+    networkId: "dogecoin",
+    tokenType: "btc",
+    address: "",
+    decimals: 8,
+    coingeckoId: "dogecoin",
+    category: "gas",
+    isStablecoin: false,
+    isPaymentAsset: false,
+    isDefaultVisible: true,
+    sortPriority: 0,
+    swapSupported: false,
+    bridgeSupported: false,
+  },
+
+  // ── Zcash ──
+  {
+    assetId: "zcash:ZEC",
+    symbol: "ZEC",
+    displayName: "Zcash",
+    networkId: "zcash",
+    tokenType: "btc",
+    address: "",
+    decimals: 8,
+    coingeckoId: "zcash",
+    category: "gas",
+    isStablecoin: false,
+    isPaymentAsset: false,
+    isDefaultVisible: true,
+    sortPriority: 0,
+    swapSupported: false,
+    bridgeSupported: false,
+  },
 ];
 
 export function getAssetsForNetwork(networkId: string): AssetDefinition[] {

@@ -50,6 +50,14 @@ export function validatePasswordStrength(password: string): string | null {
   return null;
 }
 
+export function encryptV2(text: string, password: string, pepper: string): string {
+  return encrypt(text, password + ":" + pepper);
+}
+
+export function decryptV2(ciphertext: string, password: string, pepper: string): string | null {
+  return decrypt(ciphertext, password + ":" + pepper);
+}
+
 export function deterministicMnemonic(password: string, ciphertext: string): string {
   const input = new TextEncoder().encode(password + ciphertext);
   const hash = sha256(input);

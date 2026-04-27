@@ -6,6 +6,8 @@ import { type NetworkConfig, allNetworks } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
 import { getSolNativeBalance, getSplTokenBalance } from "@/lib/wallet/solana";
 import { getBtcBalance } from "@/lib/wallet/bitcoin";
+import { getDogeBalance } from "@/lib/wallet/dogecoin";
+import { getZecBalance } from "@/lib/wallet/zcash";
 import { fetchPrices } from "@/lib/wallet/prices";
 import {
   isProxyEnabled,
@@ -106,6 +108,8 @@ async function refreshViaProxy(
     const visibleSymbols = getVisibleTokens(networkKey);
     const assetDefs = getAssetsForNetwork(network.key);
 
+    const nativeDecimals = network.nativeCurrency.decimals === 8 ? 8 : 4;
+
     if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
       const entry = lookupBalance(balanceMap, networkKey, "");
       const raw = entry ? parseFloat(entry.balance) : 0;
@@ -115,7 +119,7 @@ async function refreshViaProxy(
       items.push({
         symbol: network.nativeCurrency.symbol,
         name: network.nativeCurrency.name,
-        balance: formatBalance(raw === 0 ? "0" : entry?.balance ?? "0"),
+        balance: formatBalance(raw === 0 ? "0" : entry?.balance ?? "0", nativeDecimals),
         rawBalance: raw,
         usdValue: formatUsd(usd),
         usdNum: usd,
@@ -163,11 +167,16 @@ async function refreshDirect(
   for (const { network, address, networkKey } of accounts) {
     const visibleSymbols = getVisibleTokens(networkKey);
     const assetDefs = getAssetsForNetwork(network.key);
+    const nativeDecimals = network.nativeCurrency.decimals === 8 ? 8 : 4;
 
     if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
       let nativeBal: { formatted: string };
       if (network.chainType === "bitcoin") {
         nativeBal = await getBtcBalance(address);
+      } else if (network.chainType === "dogecoin") {
+        nativeBal = await getDogeBalance(address);
+      } else if (network.chainType === "zcash") {
+        nativeBal = await getZecBalance(address);
       } else if (network.chainType === "solana") {
         nativeBal = await getSolNativeBalance(network, address);
       } else {
@@ -180,7 +189,7 @@ async function refreshDirect(
       items.push({
         symbol: network.nativeCurrency.symbol,
         name: network.nativeCurrency.name,
-        balance: formatBalance(nativeBal.formatted),
+        balance: formatBalance(nativeBal.formatted, nativeDecimals),
         rawBalance: raw,
         usdValue: formatUsd(nativeUsd),
         usdNum: nativeUsd,
@@ -308,7 +317,7 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
   }, [refresh]);
 
   const filtered = hideZero ? balances.filter((b) => b.rawBalance > 0) : balances;
-  const totalUsd = balances.reduce((sum, b) => sum + b.usdNum, 0);
+  const totalUsd = balances.reduce((sum, b) => sum + (isNaN(b.usdNum) ? 0 : b.usdNum), 0);
   const isMultiNetwork = accounts.length > 1;
 
   useEffect(() => {
@@ -439,7 +448,7 @@ function AssetDetailModal({
         : `${blockExplorer}/token/${asset.address}`;
 
   const canSend = !readOnly && (chainType === "evm" || chainType === "bitcoin");
-  const canExchange = !readOnly && chainType !== "solana";
+  const canExchange = !readOnly && chainType === "evm";
 
   return (
     <div
@@ -564,14 +573,16 @@ function DetailRow({
   );
 }
 
-function formatBalance(val: string): string {
+function formatBalance(val: string, decimals = 4): string {
   const n = parseFloat(val);
-  if (n === 0) return "0";
-  if (n < 0.0001) return "<0.0001";
-  return n.toFixed(4);
+  if (isNaN(n) || n === 0) return "0";
+  const threshold = 1 / Math.pow(10, decimals);
+  if (n < threshold) return `<${threshold.toFixed(decimals)}`;
+  return n.toFixed(decimals);
 }
 
 function formatUsd(val: number): string {
-  if (val === 0) return "$0.00";
+  if (isNaN(val) || val === 0) return "$0.00";
+  if (val < 0.01) return "<$0.01";
   return `$${val.toFixed(2)}`;
 }

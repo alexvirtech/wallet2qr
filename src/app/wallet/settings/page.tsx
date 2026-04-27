@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
-import type { UiMode, PaymentAssetPref, PaymentNetworkPref, RoutingMode, CustomToken } from "@/lib/wallet/settings";
+import type { UiMode, CustomToken } from "@/lib/wallet/settings";
 import { allNetworks, allNetworkKeys } from "@/lib/wallet/networks";
 import { getAssetsForNetwork } from "@/lib/wallet/assets";
 import { deriveAccount } from "@/lib/wallet/derive";
@@ -14,7 +14,7 @@ import { buildQrUrl } from "@/lib/compat/qrPayload";
 import PasswordModal from "@/components/PasswordModal";
 import QrCanvas from "@/components/QrCanvas";
 
-type Tab = "recovery" | "payment" | "assets";
+type Tab = "recovery" | "assets";
 
 type ModalAction =
   | { type: "reveal" }
@@ -29,9 +29,6 @@ export default function SettingsPage() {
   const {
     settings,
     setMode,
-    setPaymentAssetPref,
-    setPaymentNetworkPref,
-    setRoutingMode,
     addNetwork,
     removeNetwork,
     toggleNetworkVisible,
@@ -48,7 +45,7 @@ export default function SettingsPage() {
     getCustomTokensForNetwork,
   } = useSettings();
 
-  const [tab, setTab] = useState<Tab>("payment");
+  const [tab, setTab] = useState<Tab>("assets");
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [modalAction, setModalAction] = useState<ModalAction | null>(null);
   const [expandedNets, setExpandedNets] = useState<Record<string, boolean>>({});
@@ -186,7 +183,6 @@ export default function SettingsPage() {
       <div className="flex border-b border-gray-200 dark:border-gray-600 mb-6 overflow-x-auto">
         {(
           [
-            { key: "payment" as Tab, label: "Payment" },
             { key: "assets" as Tab, label: "Networks & Assets" },
             { key: "recovery" as Tab, label: "Recovery" },
           ] as const
@@ -204,61 +200,6 @@ export default function SettingsPage() {
           </button>
         ))}
       </div>
-
-      {/* Payment Defaults tab */}
-      {tab === "payment" && (
-        <section className="space-y-6">
-          <h2 className="text-lg font-bold">Payment Defaults</h2>
-          <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4 space-y-4">
-            <div>
-              <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-                Preferred Payment Asset
-              </label>
-              <select
-                value={settings.preferredPaymentAsset}
-                onChange={(e) => setPaymentAssetPref(e.target.value as PaymentAssetPref)}
-                className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
-              >
-                <option value="auto">Auto (system selects best)</option>
-                <option value="USDT">USDT</option>
-                <option value="USDC">USDC</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-                Preferred Payment Network
-              </label>
-              <select
-                value={settings.preferredPaymentNetwork}
-                onChange={(e) => setPaymentNetworkPref(e.target.value as PaymentNetworkPref)}
-                className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
-              >
-                <option value="auto">Auto (lowest fee)</option>
-                {activeKeys
-                  .filter((k) => k !== "bitcoin")
-                  .map((k) => (
-                    <option key={k} value={k}>{allNetworks[k]?.name}</option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-bold text-gray-600 dark:text-gray-300">
-                Routing Mode
-              </label>
-              <select
-                value={settings.routingMode}
-                onChange={(e) => setRoutingMode(e.target.value as RoutingMode)}
-                className="mt-1 px-2 py-1.5 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
-              >
-                <option value="lowest_fee">Lowest Fee</option>
-                <option value="fastest">Fastest</option>
-                <option value="best_liquidity">Best Liquidity</option>
-                <option value="manual">Manual Confirmation</option>
-              </select>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Networks & Assets tab */}
       {tab === "assets" && (
@@ -499,7 +440,7 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Add custom token */}
-                        {!readOnly && net.chainType !== "bitcoin" && (
+                        {!readOnly && net.chainType === "evm" && (
                           <div>
                             {addTokenNet === key ? (
                               <div className="p-3 border border-gray-200 dark:border-gray-600 rounded space-y-2">

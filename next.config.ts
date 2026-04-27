@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https: http:",
               "media-src 'self' blob:",
-              "connect-src 'self' https://blockchain-proxy.vercel.app https://*.llamarpc.com https://*.infura.io https://*.alchemy.com https://*.publicnode.com https://api.coingecko.com https://li.quest https://*.lifi.tools https://api.mainnet-beta.solana.com https://*.solana.com https://accounts.google.com https://*.googleapis.com https://mempool.space https://*.ninerealms.com https://gateway.liquify.com wss://relay.walletconnect.com https://relay.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org https://*.reown.com",
+              "connect-src 'self' https://blockchain-proxy.vercel.app https://*.llamarpc.com https://*.infura.io https://*.alchemy.com https://*.publicnode.com https://api.coingecko.com https://li.quest https://*.lifi.tools https://api.mainnet-beta.solana.com https://*.solana.com https://accounts.google.com https://*.googleapis.com https://mempool.space https://blockchair.com https://*.ninerealms.com https://gateway.liquify.com wss://relay.walletconnect.com https://relay.walletconnect.com https://*.walletconnect.com https://*.walletconnect.org https://*.reown.com",
               "font-src 'self'",
               "worker-src 'self' blob:",
               "frame-src 'none'",

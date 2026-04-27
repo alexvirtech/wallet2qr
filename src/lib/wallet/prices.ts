@@ -45,6 +45,8 @@ const COINGECKO_IDS = [
   "pyth-network",
   "pancakeswap-token",
   "first-digital-usd",
+  "dogecoin",
+  "zcash",
 ];
 
 const defaultPrices: Record<string, number> = {
@@ -52,6 +54,7 @@ const defaultPrices: Record<string, number> = {
   USDT: 1, USDC: 1, FDUSD: 1,
   LINK: 0, UNI: 0, GMX: 0, JOE: 0, QI: 0,
   JUP: 0, PYTH: 0, CAKE: 0,
+  DOGE: 0, ZEC: 0,
 };
 
 async function fetchFromCoinGecko(): Promise<Record<string, number>> {
@@ -81,6 +84,8 @@ async function fetchFromCoinGecko(): Promise<Record<string, number>> {
     PYTH: data["pyth-network"]?.usd ?? 0,
     CAKE: data["pancakeswap-token"]?.usd ?? 0,
     FDUSD: data["first-digital-usd"]?.usd ?? 1,
+    DOGE: data.dogecoin?.usd ?? 0,
+    ZEC: data.zcash?.usd ?? 0,
   };
 }
 
@@ -100,9 +105,16 @@ export async function fetchPrices(): Promise<Record<string, number>> {
   }
 
   try {
-    const prices = isProxyEnabled()
-      ? await fetchProxyPrices()
-      : await fetchFromCoinGecko();
+    let prices: Record<string, number>;
+    if (isProxyEnabled()) {
+      try {
+        prices = await fetchProxyPrices();
+      } catch {
+        prices = await fetchFromCoinGecko();
+      }
+    } else {
+      prices = await fetchFromCoinGecko();
+    }
 
     cache = { prices, timestamp: Date.now() };
     if (typeof window !== "undefined") saveCachedPrices(cache);

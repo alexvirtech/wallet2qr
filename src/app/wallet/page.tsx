@@ -10,15 +10,6 @@ import NetworkSwitcher from "@/components/NetworkSwitcher";
 import BalanceList from "@/components/BalanceList";
 import QRCode from "qrcode";
 
-const SHORT_NAMES: Record<string, string> = {
-  arbitrum: "Arbitrum",
-  ethereum: "Ethereum",
-  bnb: "BNB",
-  avalanche: "Avalanche",
-  solana: "Solana",
-  bitcoin: "Bitcoin",
-};
-
 export default function WalletPage() {
   const { mnemonic, isUnlocked } = useSession();
   const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
@@ -43,7 +34,6 @@ export default function WalletPage() {
   const [copied, setCopied] = useState(false);
   const addressQrRef = useRef<HTMLCanvasElement>(null);
 
-  const isSimple = settings.mode === "simple";
   const isAllNetworks = networkKey === "all";
 
   const handleNetworkChange = useCallback((key: string) => {
@@ -130,41 +120,10 @@ export default function WalletPage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold">Wallet</h1>
-        {!isSimple && (
-          <NetworkSwitcher current={networkKey} onChange={handleNetworkChange} showAll />
-        )}
+        <NetworkSwitcher current={networkKey} onChange={handleNetworkChange} showAll />
       </div>
-
-      {/* Simple mode: network pills */}
-      {isSimple && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <button
-            onClick={() => handleNetworkChange("all")}
-            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-              isAllNetworks
-                ? "bg-blue-500 text-white"
-                : "bg-gray-100 dark:bg-m-blue-dark-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
-          >
-            All
-          </button>
-          {activeKeys.map((k) => (
-            <button
-              key={k}
-              onClick={() => handleNetworkChange(k)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
-                k === networkKey
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-100 dark:bg-m-blue-dark-3 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
-            >
-              {SHORT_NAMES[k] ?? k}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Total balance */}
       <div className="h-10 mb-4 flex items-center justify-between">

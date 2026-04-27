@@ -5,6 +5,8 @@ import { privateKeyToAccount } from "viem/accounts";
 import type { Hex } from "viem";
 import { deriveSolanaAccount } from "./solana";
 import { deriveBitcoinAccount } from "./bitcoin";
+import { deriveDogecoinAccount } from "./dogecoin";
+import { deriveZcashAccount } from "./zcash";
 import type { ChainType } from "./networks";
 
 const EVM_PATH = "m/44'/60'/0'/0/0";
@@ -62,6 +64,14 @@ export function deriveAccount(mnemonic: string, chainType: ChainType, path?: str
   if (chainType === "bitcoin") {
     const btc = deriveBitcoinAccount(mnemonic, path);
     return { address: btc.address, privateKey: btc.privateKey };
+  }
+  if (chainType === "dogecoin") {
+    const doge = deriveDogecoinAccount(mnemonic, path);
+    return { address: doge.address, privateKey: doge.privateKey };
+  }
+  if (chainType === "zcash") {
+    const zec = deriveZcashAccount(mnemonic, path);
+    return { address: zec.address, privateKey: zec.privateKey };
   }
   const evm = deriveEvmAccount(mnemonic, path);
   return { address: evm.address as string, privateKey: evm.privateKey as string };
