@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
 import { derivePepper, subHash, isPremium } from "@/lib/pepper";
 
-export async function POST(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
-  if (!token) {
-    return NextResponse.json({ error: "Not signed in — no token" }, { status: 401 });
+export async function POST() {
+  const session = await auth();
+  if (!session) {
+    return NextResponse.json({ error: "Not signed in — no session" }, { status: 401 });
   }
 
-  const provider = (token.oauthProvider ?? token.provider ?? null) as string | null;
-  const sub = (token.oauthSub ?? token.sub ?? null) as string | null;
-
+  const provider = session.provider;
+  const sub = session.providerSub ?? session.sub;
   if (!provider || !sub) {
     return NextResponse.json(
-      { error: `Token missing provider/sub — sign out and sign back in (keys: ${Object.keys(token).join(",")})` },
+      { error: `Session missing provider/sub — sign out and sign back in (provider=${provider ?? "none"}, sub=${sub ? "yes" : "none"})` },
       { status: 401 }
     );
   }
