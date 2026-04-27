@@ -32,7 +32,6 @@ export default function QrToWalletPage() {
   const [mode, setMode] = useState<Mode>("wallet");
   const [readOnly, setReadOnly] = useState(false);
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
-  const [forceAccountBound, setForceAccountBound] = useState(false);
   const { setSession } = useSession();
   const router = useRouter();
   const { data: authSession, status: authStatus } = useAuthSession();
@@ -40,8 +39,6 @@ export default function QrToWalletPage() {
   const isSignedIn = authStatus === "authenticated";
 
   const isV2 = envelope?.v === 2;
-  const needsLogin = isV2 || forceAccountBound;
-
   const accountMismatch = useMemo(() => {
     if (!isV2 || !isSignedIn || !authSession?.sub) return false;
     const env = envelope as { v: 2; sh: string };
@@ -61,7 +58,7 @@ export default function QrToWalletPage() {
       setError("Upload a QR code and enter a password.");
       return;
     }
-    if (needsLogin && !isSignedIn) {
+    if (isV2 && !isSignedIn) {
       setError("Please sign in first.");
       return;
     }
@@ -76,7 +73,7 @@ export default function QrToWalletPage() {
     try {
       let mnemonic: string;
 
-      if (needsLogin && isSignedIn) {
+      if (isV2 && isSignedIn) {
         const { pepper } = await fetchPepper();
         const decrypted = decryptPayloadV2(envelope.ds, password, pepper);
         if (decrypted) {
@@ -88,12 +85,9 @@ export default function QrToWalletPage() {
           }
           mnemonic = decrypted;
         } else {
-          if (isV2) {
-            setError("Decryption failed — wrong password or wrong account.");
-            setDecrypting(false);
-            return;
-          }
-          mnemonic = deterministicMnemonic(password, envelope.ds);
+          setError("Decryption failed — wrong password or wrong account.");
+          setDecrypting(false);
+          return;
         }
       } else {
         const decrypted = decryptPayload(envelope.ds, password);
@@ -120,7 +114,7 @@ export default function QrToWalletPage() {
       setError(err instanceof Error ? err.message : "Decryption failed");
       setDecrypting(false);
     }
-  }, [envelope, password, mode, readOnly, setSession, router, needsLogin, isSignedIn, accountMismatch, isV2]);
+  }, [envelope, password, mode, readOnly, setSession, router, isV2, isSignedIn, accountMismatch]);
 
   const handleReset = useCallback(() => {
     setRawQrUrl(null);
@@ -130,10 +124,9 @@ export default function QrToWalletPage() {
     setRevealedMnemonic(null);
     setMode("wallet");
     setReadOnly(false);
-    setForceAccountBound(false);
   }, []);
 
-  const canDecrypt = !decrypting && (!needsLogin || (isSignedIn && !accountMismatch));
+  const canDecrypt = !decrypting && (!isV2 || (isSignedIn && !accountMismatch));
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
@@ -265,20 +258,6 @@ export default function QrToWalletPage() {
               </label>
             )}
           </div>
-
-          {!isV2 && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={forceAccountBound}
-                onChange={(e) => setForceAccountBound(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600"
-              />
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Force account-bound decrypt (advanced)
-              </span>
-            </label>
-          )}
 
           {error && <p className="text-m-red text-sm">{error}</p>}
 
