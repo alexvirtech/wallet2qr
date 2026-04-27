@@ -48,12 +48,13 @@ export default function QrToWalletPage() {
   }, []);
 
   const isV2 = envelope?.v === 2;
+  const providerSub = authSession?.providerSub ?? authSession?.sub;
   const accountMismatch = useMemo(() => {
-    if (!isV2 || !isSignedIn || !authSession?.sub) return false;
+    if (!isV2 || !isSignedIn || !providerSub) return false;
     const env = envelope as { v: 2; sh: string };
-    const currentHash = computeSubHash(authSession.sub);
+    const currentHash = computeSubHash(providerSub);
     return currentHash !== env.sh;
-  }, [isV2, isSignedIn, authSession?.sub, envelope]);
+  }, [isV2, isSignedIn, providerSub, envelope]);
 
   const handleDecoded = useCallback((rawUrl: string) => {
     setRawQrUrl(rawUrl);

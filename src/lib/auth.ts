@@ -21,14 +21,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     jwt({ token, account }) {
       if (account) {
-        token.provider = account.provider as "google" | "apple";
-        token.sub = account.providerAccountId;
+        token.oauthProvider = account.provider as "google" | "apple";
+        token.oauthSub = account.providerAccountId;
       }
       return token;
     },
     session({ session, token }) {
-      session.provider = token.provider;
-      session.sub = token.sub;
+      session.provider = token.oauthProvider;
+      session.providerSub = token.oauthSub;
+      session.sub = token.oauthSub ?? token.sub;
       return session;
     },
     redirect({ url, baseUrl }) {

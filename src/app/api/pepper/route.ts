@@ -7,10 +7,11 @@ export async function POST() {
   if (!session) {
     return NextResponse.json({ error: "Not signed in — no session" }, { status: 401 });
   }
-  if (!session.provider || !session.sub) {
+  const provider = session.provider;
+  const sub = session.providerSub ?? session.sub;
+  if (!provider || !sub) {
     return NextResponse.json(
-      { error: "Session missing provider/sub — please sign out and sign back in",
-        debug: { hasUser: !!session.user, email: session.user?.email, provider: session.provider ?? null, sub: session.sub ?? null } },
+      { error: `Session missing provider/sub — please sign out and sign back in (provider=${provider ?? "none"}, sub=${sub ? "present" : "none"})` },
       { status: 401 }
     );
   }
@@ -22,8 +23,8 @@ export async function POST() {
 
   try {
     // eslint-disable-next-line no-restricted-syntax -- pepper is intentionally returned, never logged
-    const pepper = derivePepper(session.provider, session.sub);
-    const sh = subHash(session.sub);
+    const pepper = derivePepper(provider, sub);
+    const sh = subHash(sub);
 
     return NextResponse.json({
       provider: session.provider,
