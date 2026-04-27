@@ -3,9 +3,15 @@ import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
   const hostname = req.headers.get("host") ?? "";
-  const isAdmin = hostname.startsWith("admin.");
   const path = req.nextUrl.pathname;
 
+  if (hostname.startsWith("www.")) {
+    const url = req.nextUrl.clone();
+    url.host = hostname.replace(/^www\./, "");
+    return NextResponse.redirect(url, 308);
+  }
+
+  const isAdmin = hostname.startsWith("admin.");
   if (isAdmin) {
     if (path.startsWith("/api/auth")) {
       return NextResponse.next();
