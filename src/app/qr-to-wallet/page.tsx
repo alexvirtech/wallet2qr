@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession as useAuthSession, signIn as authSignIn } from "next-auth/react";
 import QrScanner from "@/components/QrScanner";
@@ -37,6 +37,15 @@ export default function QrToWalletPage() {
   const { data: authSession, status: authStatus } = useAuthSession();
 
   const isSignedIn = authStatus === "authenticated";
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("w2q_pending_qr");
+    if (saved) {
+      sessionStorage.removeItem("w2q_pending_qr");
+      setRawQrUrl(saved);
+      setEnvelope(parseEnvelope(saved));
+    }
+  }, []);
 
   const isV2 = envelope?.v === 2;
   const accountMismatch = useMemo(() => {
@@ -175,7 +184,10 @@ export default function QrToWalletPage() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => authSignIn("google")}
+                    onClick={() => {
+                      if (rawQrUrl) sessionStorage.setItem("w2q_pending_qr", rawQrUrl);
+                      authSignIn("google", { callbackUrl: "/qr-to-wallet" });
+                    }}
                     className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300 py-1 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
                   >
                     Sign in with Google
