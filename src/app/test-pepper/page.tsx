@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
+import SignInButtons from "@/components/SignInButtons";
 import { encrypt, decrypt, encryptV2, decryptV2 } from "@/lib/compat/crypto";
 import { buildQrUrl, buildQrUrlV2, parseEnvelope, decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
@@ -137,9 +138,7 @@ export default function TestPepperPage() {
         </p>
         <div className="flex gap-2">
           {status !== "authenticated" ? (
-            <button onClick={() => signIn("google")} className="bg-blue-500 hover:bg-blue-700 text-white text-sm font-bold py-1 px-3 rounded">
-              Sign in with Google
-            </button>
+            <SignInButtons compact />
           ) : (
             <button onClick={() => signOut()} className="bg-gray-300 hover:bg-gray-400 text-gray-700 text-sm font-bold py-1 px-3 rounded">
               Sign out

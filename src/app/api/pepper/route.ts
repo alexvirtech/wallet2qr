@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { derivePepper, subHash, isPremium } from "@/lib/pepper";
+import { derivePepper, subHash } from "@/lib/pepper";
 
 export async function POST() {
   const session = await auth();
@@ -15,10 +15,6 @@ export async function POST() {
       { error: `Session missing provider/sub — sign out and sign back in (provider=${provider ?? "none"}, sub=${sub ? "yes" : "none"})` },
       { status: 401 }
     );
-  }
-
-  if (!isPremium({ provider, sub })) {
-    return NextResponse.json({ error: "Premium required" }, { status: 402 });
   }
 
   try {

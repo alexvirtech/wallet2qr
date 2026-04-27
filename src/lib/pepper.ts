@@ -39,7 +39,3 @@ export function subHash(sub: string): string {
     .replace(/=+$/, "");
 }
 
-// TODO(QRT): replace with real QRT ledger check
-export function isPremium(_session: { provider?: string; sub?: string }): boolean {
-  return !!_session.provider && !!_session.sub;
-}

@@ -8,7 +8,7 @@ export interface V1Envelope {
 export interface V2Envelope {
   v: 2;
   ds: string;
-  pep: "google" | "apple";
+  pep: string;
   sh: string;
 }
 
@@ -25,7 +25,7 @@ export function buildQrUrlV2(
   plaintext: string,
   password: string,
   pepper: string,
-  provider: "google" | "apple",
+  provider: string,
   subHash: string
 ): string {
   const ds = encryptV2(plaintext, password, pepper);
@@ -43,7 +43,7 @@ export function parseEnvelope(url: string): Envelope {
       return {
         v: 2,
         ds,
-        pep: u.searchParams.get("pep") as "google" | "apple",
+        pep: u.searchParams.get("pep") ?? "google",
         sh: u.searchParams.get("sh") ?? "",
       };
     }

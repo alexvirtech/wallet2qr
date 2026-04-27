@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession as useAuthSession, signIn as authSignIn } from "next-auth/react";
+import { useSession as useAuthSession } from "next-auth/react";
 import QrScanner from "@/components/QrScanner";
+import SignInButtons, { providerDisplayName } from "@/components/SignInButtons";
 import { decryptPayload, decryptPayloadV2, parseEnvelope } from "@/lib/compat/qrPayload";
 import type { Envelope } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
@@ -174,25 +175,20 @@ export default function QrToWalletPage() {
           </div>
 
           {isV2 && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                This QR is bound to a {(envelope as { pep: string }).pep === "google" ? "Google" : "Apple"} account.
+                This QR is bound to a {providerDisplayName((envelope as { pep: string }).pep)} account.
               </p>
               {!isSignedIn && (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <p className="text-xs text-blue-600 dark:text-blue-400">
                     Sign in with the original account to decrypt.
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (rawQrUrl) sessionStorage.setItem("w2q_pending_qr", rawQrUrl);
-                      authSignIn("google", { callbackUrl: "/qr-to-wallet" });
-                    }}
-                    className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300 py-1 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                  >
-                    Sign in with Google
-                  </button>
+                  <SignInButtons
+                    callbackUrl="/qr-to-wallet"
+                    onBeforeSignIn={() => { if (rawQrUrl) sessionStorage.setItem("w2q_pending_qr", rawQrUrl); }}
+                    compact
+                  />
                 </div>
               )}
               {isSignedIn && accountMismatch && (
@@ -201,9 +197,14 @@ export default function QrToWalletPage() {
                 </p>
               )}
               {isSignedIn && !accountMismatch && (
-                <p className="text-xs text-m-green">
-                  Signed in as {authSession?.user?.email} — account matches.
-                </p>
+                <div className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span className="text-xs text-green-700 dark:text-green-300">
+                    Signed in as <strong>{authSession?.user?.email}</strong> — account matches.
+                  </span>
+                </div>
               )}
             </div>
           )}

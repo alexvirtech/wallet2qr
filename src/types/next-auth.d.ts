@@ -2,9 +2,11 @@ import "next-auth";
 import "@auth/core/types";
 import "@auth/core/jwt";
 
+type OAuthProvider = "google" | "apple" | "github" | "microsoft-entra-id";
+
 declare module "next-auth" {
   interface Session {
-    provider?: "google" | "apple";
+    provider?: OAuthProvider;
     providerSub?: string;
     sub?: string;
   }
@@ -12,7 +14,7 @@ declare module "next-auth" {
 
 declare module "@auth/core/types" {
   interface Session {
-    provider?: "google" | "apple";
+    provider?: OAuthProvider;
     providerSub?: string;
     sub?: string;
   }
@@ -20,7 +22,7 @@ declare module "@auth/core/types" {
 
 declare module "@auth/core/jwt" {
   interface JWT {
-    oauthProvider?: "google" | "apple";
+    oauthProvider?: OAuthProvider;
     oauthSub?: string;
   }
 }

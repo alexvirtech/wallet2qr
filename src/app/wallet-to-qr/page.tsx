@@ -2,9 +2,10 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useSession as useAuthSession, signIn as authSignIn } from "next-auth/react";
+import { useSession as useAuthSession } from "next-auth/react";
 import MnemonicInput from "@/components/MnemonicInput";
 import QrCanvas from "@/components/QrCanvas";
+import SignInButtons, { providerDisplayName } from "@/components/SignInButtons";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { validatePasswordStrength } from "@/lib/compat/crypto";
 import { buildQrUrl, buildQrUrlV2, decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
@@ -156,42 +157,48 @@ export default function WalletToQrPage() {
         </div>
 
         {!qrData && (
-          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className={`rounded-xl border transition-colors ${bindAccount ? "border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20" : "border-gray-200 dark:border-gray-700"} p-4 space-y-3`}>
+            <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={bindAccount}
                 onChange={(e) => setBindAccount(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600"
+                className="rounded border-gray-300 dark:border-gray-600 mt-0.5"
               />
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                Bind this QR to my Google/Apple account
-              </span>
-              <span className="text-xs text-blue-500 font-bold">premium</span>
+              <div>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-200 block">
+                  Bind to my account
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  Adds a second factor — only your account + password can decrypt this QR.
+                </span>
+              </div>
             </label>
 
-            {bindAccount && !isSignedIn && (
-              <div className="ml-6 space-y-2">
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Sign in so only your account can decrypt this QR.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => authSignIn("google")}
-                  className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300 py-1 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                >
-                  Sign in with Google
-                </button>
+            {bindAccount && (
+              <div className="ml-7 space-y-3">
+                {!isSignedIn ? (
+                  <>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Choose a provider to bind this QR to your account:
+                    </p>
+                    <SignInButtons />
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span className="text-xs text-green-700 dark:text-green-300">
+                      Signed in as <strong>{authSession?.user?.email}</strong>
+                      {authSession?.provider && (
+                        <span className="text-green-600 dark:text-green-400"> via {providerDisplayName(authSession.provider)}</span>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
-
-            {bindAccount && isSignedIn && (
-              <p className="ml-6 text-xs text-m-green">
-                Signed in as {authSession?.user?.email} — QR will be bound to this account.
-              </p>
-            )}
-
-            {/* TODO(QRT): show "Premium required" when signed in but not premium */}
           </div>
         )}
 

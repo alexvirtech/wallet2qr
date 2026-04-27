@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useSession as useAuthSession, signIn as authSignIn } from "next-auth/react";
+import { useSession as useAuthSession } from "next-auth/react";
+import SignInButtons from "@/components/SignInButtons";
 import { decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
@@ -107,17 +108,11 @@ function DeepLinkHandler() {
               This wallet is bound to a {providerName} account.
             </p>
             {!isSignedIn && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <p className="text-xs text-blue-600 dark:text-blue-400">
                   Sign in with the original account to decrypt.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => authSignIn("google", { callbackUrl: window.location.href })}
-                  className="bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-sm font-bold text-gray-700 dark:text-gray-300 py-1 px-3 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                >
-                  Sign in with {providerName}
-                </button>
+                <SignInButtons callbackUrl={typeof window !== "undefined" ? window.location.href : "/"} compact />
               </div>
             )}
             {isSignedIn && (

@@ -1,5 +1,5 @@
 export interface PepperResponse {
-  provider: "google" | "apple";
+  provider: string;
   sub_hash: string;
   pepper: string;
 }

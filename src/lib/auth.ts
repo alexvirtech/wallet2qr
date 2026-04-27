@@ -1,10 +1,12 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
-
-// TODO(A1-apple): add Apple provider when credentials are available
-// import Apple from "next-auth/providers/apple";
+import Apple from "next-auth/providers/apple";
+import GitHub from "next-auth/providers/github";
+import MicrosoftEntraId from "next-auth/providers/microsoft-entra-id";
 
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "alex@vir-tec.net";
+
+export type OAuthProvider = "google" | "apple" | "github" | "microsoft-entra-id";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -12,16 +14,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
     }),
-    // TODO(A1-apple): uncomment when Apple credentials are ready
-    // Apple({
-    //   clientId: process.env.AUTH_APPLE_ID,
-    //   clientSecret: process.env.AUTH_APPLE_SECRET,
-    // }),
+    Apple({
+      clientId: process.env.AUTH_APPLE_ID!,
+      clientSecret: process.env.AUTH_APPLE_SECRET!,
+    }),
+    GitHub({
+      clientId: process.env.AUTH_GITHUB_ID!,
+      clientSecret: process.env.AUTH_GITHUB_SECRET!,
+    }),
+    MicrosoftEntraId({
+      clientId: process.env.AUTH_MICROSOFT_ID!,
+      clientSecret: process.env.AUTH_MICROSOFT_SECRET!,
+    }),
   ],
   callbacks: {
     jwt({ token, account }) {
       if (account) {
-        token.oauthProvider = account.provider as "google" | "apple";
+        token.oauthProvider = account.provider as OAuthProvider;
         token.oauthSub = account.providerAccountId;
       }
       return token;
