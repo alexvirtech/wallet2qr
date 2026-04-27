@@ -5,9 +5,14 @@ export interface PepperResponse {
 }
 
 export async function fetchPepper(): Promise<PepperResponse> {
-  const res = await fetch("/api/pepper", { method: "POST" });
-  if (res.status === 401) throw new Error("Not signed in");
-  if (res.status === 402) throw new Error("Premium required");
-  if (!res.ok) throw new Error(`Pepper API error: ${res.status}`);
+  const res = await fetch("/api/pepper", {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const msg = body?.error ?? `Pepper API error: ${res.status}`;
+    throw new Error(msg);
+  }
   return res.json();
 }
