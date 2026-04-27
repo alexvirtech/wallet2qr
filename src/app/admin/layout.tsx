@@ -1,11 +1,11 @@
-import { auth, signIn, signOut } from "@/lib/auth";
+import { auth, signIn, signOut, ADMIN_EMAIL } from "@/lib/auth";
 
 export const metadata = { title: "wallet2qr Admin" };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
-  if (!session?.user) {
+  if (!session?.user || session.user.email !== ADMIN_EMAIL) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
