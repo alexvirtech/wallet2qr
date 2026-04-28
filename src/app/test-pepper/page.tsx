@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import SignInButtons from "@/components/SignInButtons";
+import SignInButtons, { providerDisplayName } from "@/components/SignInButtons";
 import { encrypt, decrypt, encryptV2, decryptV2 } from "@/lib/compat/crypto";
 import { buildQrUrl, buildQrUrlV2, parseEnvelope, decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
@@ -131,15 +131,17 @@ export default function TestPepperPage() {
         Interactive test for v1 (password-only) and v2 (account-bound) encrypt/decrypt flows.
       </p>
 
-      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-6 space-y-2">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-6 space-y-3">
         <p className="text-sm font-bold text-gray-700 dark:text-gray-300">
           Auth: <span className={status === "authenticated" ? "text-green-600" : "text-red-500"}>{status}</span>
           {session?.user?.email && <span className="text-gray-500 ml-2">({session.user.email})</span>}
+          {status === "authenticated" && (session as any)?.provider && (
+            <span className="text-gray-400 ml-1">via {providerDisplayName((session as any).provider)}</span>
+          )}
         </p>
-        <div className="flex gap-2">
-          {status !== "authenticated" ? (
-            <SignInButtons compact />
-          ) : (
+        <div className="space-y-2">
+          <SignInButtons compact activeProviderId={status === "authenticated" ? (session as any)?.provider : null} />
+          {status === "authenticated" && (
             <button onClick={() => signOut()} className="bg-gray-300 hover:bg-gray-400 text-gray-700 text-sm font-bold py-1 px-3 rounded">
               Sign out
             </button>
