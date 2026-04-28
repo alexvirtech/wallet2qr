@@ -235,72 +235,64 @@ function TwoLayerSection() {
   );
 }
 
-function ArrowDown({ className = "" }: { className?: string }) {
-  return (
-    <svg width="20" height="28" viewBox="0 0 20 28" className={`text-gray-300 dark:text-gray-600 flex-shrink-0 ${className}`}>
-      <line x1="10" y1="0" x2="10" y2="20" stroke="currentColor" strokeWidth="2" />
-      <polyline points="4,16 10,24 16,16" fill="none" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
 function FlowInfographic() {
   return (
-    <div className="flex flex-col items-center gap-1 py-4 max-w-lg mx-auto">
+    <div className="flex items-center justify-center gap-2 sm:gap-3 py-4 max-w-2xl mx-auto">
       {/* Mnemonic */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-14 h-14 rounded-2xl bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+      <div className="flex flex-col items-center gap-1 w-16 sm:w-20">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 sm:w-6 sm:h-6">
             <rect x="3" y="4" width="18" height="16" rx="2" />
             <line x1="7" y1="9" x2="17" y2="9" />
             <line x1="7" y1="13" x2="14" y2="13" />
-            <line x1="7" y1="17" x2="11" y2="17" />
           </svg>
         </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Your Mnemonic</span>
+        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Mnemonic</span>
       </div>
 
-      <ArrowDown />
+      {/* Arrow */}
+      <svg width="16" height="12" viewBox="0 0 16 12" className="text-gray-300 dark:text-gray-600 flex-shrink-0">
+        <line x1="0" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="2" />
+        <polyline points="8,2 14,6 8,10" fill="none" stroke="currentColor" strokeWidth="2" />
+      </svg>
 
-      {/* Two layers side by side */}
-      <div className="w-full rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-m-blue-dark-3/50 p-4">
-        <div className="text-[10px] uppercase tracking-wider text-gray-400 text-center mb-3 font-bold">Two-Layer Encryption</div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-m-blue-dark-2 p-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-                <rect x="5" y="11" width="14" height="10" rx="2" />
-                <path d="M8 11V7a4 4 0 1 1 8 0v4" />
-              </svg>
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold text-blue-600 dark:text-blue-400">Layer 1</div>
-              <div className="text-[11px] text-gray-500 dark:text-gray-400">Your Password</div>
-              <div className="text-[10px] text-gray-400 mt-0.5">AES-256</div>
+      {/* Two-layer encryption box */}
+      <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-m-blue-dark-3/50 px-2.5 py-2 sm:px-4 sm:py-2.5">
+        <div className="text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-400 text-center mb-1.5 font-bold">Encrypt</div>
+        <div className="flex gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-m-blue-dark-2 px-2 py-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500 flex-shrink-0">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+            </svg>
+            <div>
+              <div className="text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 leading-tight">Password</div>
+              <div className="text-[8px] sm:text-[9px] text-gray-400 leading-tight">AES-256</div>
             </div>
           </div>
-          <div className="flex flex-col items-center gap-2 rounded-xl border-2 border-purple-200 dark:border-purple-800 bg-white dark:bg-m-blue-dark-2 p-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-500">
-                <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
-                <path d="M9 12l2 2 4-4" />
-              </svg>
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-bold text-purple-600 dark:text-purple-400">Layer 2</div>
-              <div className="text-[11px] text-gray-500 dark:text-gray-400">Your Account</div>
-              <div className="text-[10px] text-gray-400 mt-0.5">HKDF-SHA256</div>
+          <div className="flex items-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-m-blue-dark-2 px-2 py-1.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-purple-500 flex-shrink-0">
+              <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            <div>
+              <div className="text-[10px] sm:text-[11px] font-bold text-purple-600 dark:text-purple-400 leading-tight">Account</div>
+              <div className="text-[8px] sm:text-[9px] text-gray-400 leading-tight">HKDF</div>
             </div>
           </div>
         </div>
       </div>
 
-      <ArrowDown />
+      {/* Arrow */}
+      <svg width="16" height="12" viewBox="0 0 16 12" className="text-gray-300 dark:text-gray-600 flex-shrink-0">
+        <line x1="0" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="2" />
+        <polyline points="8,2 14,6 8,10" fill="none" stroke="currentColor" strokeWidth="2" />
+      </svg>
 
       {/* QR Code */}
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-14 h-14 rounded-2xl bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-green-500">
+      <div className="flex flex-col items-center gap-1 w-16 sm:w-20">
+        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-green-500 sm:w-6 sm:h-6">
             <rect x="3" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="3" width="7" height="7" rx="1" />
             <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -313,39 +305,7 @@ function FlowInfographic() {
             <rect x="5" y="16" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
           </svg>
         </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Double-Locked QR Code</span>
-      </div>
-
-      <ArrowDown />
-
-      {/* Scan & Wallet */}
-      <div className="flex items-center gap-3">
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 dark:bg-amber-400/10 flex items-center justify-center">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
-              <rect x="4" y="2" width="16" height="20" rx="3" />
-              <rect x="7" y="6" width="4" height="4" rx="0.5" />
-              <rect x="13" y="6" width="4" height="4" rx="0.5" />
-              <rect x="7" y="12" width="4" height="4" rx="0.5" />
-            </svg>
-          </div>
-          <span className="text-[10px] font-bold text-gray-400">Scan</span>
-        </div>
-        <svg width="24" height="14" viewBox="0 0 24 14" className="text-gray-300 dark:text-gray-600 flex-shrink-0">
-          <line x1="0" y1="7" x2="16" y2="7" stroke="currentColor" strokeWidth="2" />
-          <polyline points="13,2 20,7 13,12" fill="none" stroke="currentColor" strokeWidth="2" />
-        </svg>
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
-              <rect x="2" y="6" width="20" height="14" rx="2" />
-              <path d="M2 10h20" />
-              <circle cx="17" cy="15" r="1.5" />
-              <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
-            </svg>
-          </div>
-          <span className="text-[10px] font-bold text-gray-400">Wallet</span>
-        </div>
+        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">QR Code</span>
       </div>
     </div>
   );
