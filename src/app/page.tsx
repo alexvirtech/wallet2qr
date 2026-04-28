@@ -356,14 +356,14 @@ function FlowRow({ mode }: { mode: "encrypt" | "decrypt" }) {
       <div className="flex flex-col items-center">
         <div className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
           {isEncrypt ? (
-            <svg viewBox="0 0 36 48" className="w-8 h-11 sm:w-10 sm:h-[52px]" fill="none" shapeRendering="geometricPrecision">
+            <svg viewBox="-2 -2 40 52" className="w-8 h-11 sm:w-10 sm:h-[52px]" fill="none" shapeRendering="geometricPrecision">
               <rect width="36" height="48" rx="4" stroke="#34d399" strokeWidth="2.5" />
               <line x1="7" y1="14" x2="29" y2="14" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
               <line x1="7" y1="23" x2="29" y2="23" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
               <line x1="7" y1="32" x2="22" y2="32" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
             </svg>
           ) : (
-            <svg viewBox="0 0 48 48" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" shapeRendering="geometricPrecision">
+            <svg viewBox="-2 -2 52 52" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" shapeRendering="geometricPrecision">
               <rect x="0" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
               <rect x="28" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
               <rect x="0" y="28" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
@@ -389,14 +389,14 @@ function FlowRow({ mode }: { mode: "encrypt" | "decrypt" }) {
       <div className="flex flex-col items-center">
         <div className="flex gap-1">
           <div className="w-[52px] h-[52px] sm:w-16 sm:h-16 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
-            <svg viewBox="0 0 32 36" className="w-8 h-9 sm:w-9 sm:h-10" fill="none" shapeRendering="geometricPrecision">
+            <svg viewBox="-2 -6 36 44" className="w-8 h-9 sm:w-9 sm:h-10" fill="none" shapeRendering="geometricPrecision">
               <rect x="0" y="14" width="32" height="22" rx="3" stroke="#3b82f6" strokeWidth="2.5" />
               <path d="M5 14V8a11 11 0 0 1 22 0v6" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
               <circle cx="16" cy="25" r="3" fill="#3b82f6" />
             </svg>
           </div>
           <div className="w-[52px] h-[52px] sm:w-16 sm:h-16 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
-            <svg viewBox="0 0 32 42" className="w-8 h-10 sm:w-9 sm:h-11" fill="none" shapeRendering="geometricPrecision">
+            <svg viewBox="-2 -1 36 45" className="w-8 h-10 sm:w-9 sm:h-11" fill="none" shapeRendering="geometricPrecision">
               <path d="M16 2l14 9v10c0 10-6.5 18.5-14 21C7.5 39.5 1 31 1 21V11L16 2z" stroke="#a855f7" strokeWidth="2.5" />
               <polyline points="10,23 14,27 22,19" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </svg>
@@ -424,7 +424,7 @@ function FlowRow({ mode }: { mode: "encrypt" | "decrypt" }) {
       <div className="flex flex-col items-center">
         <div className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
           {isEncrypt ? (
-            <svg viewBox="0 0 48 48" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" shapeRendering="geometricPrecision">
+            <svg viewBox="-2 -2 52 52" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" shapeRendering="geometricPrecision">
               <rect x="0" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
               <rect x="28" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
               <rect x="0" y="28" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
@@ -437,7 +437,7 @@ function FlowRow({ mode }: { mode: "encrypt" | "decrypt" }) {
               <rect x="40" y="40" width="8" height="8" rx="1.5" fill="#34d399" />
             </svg>
           ) : (
-            <svg viewBox="0 0 48 42" className="w-10 h-9 sm:w-12 sm:h-11" fill="none" shapeRendering="geometricPrecision">
+            <svg viewBox="-1 -2 50 46" className="w-10 h-9 sm:w-12 sm:h-11" fill="none" shapeRendering="geometricPrecision">
               <rect x="1" y="10" width="46" height="31" rx="4" stroke="#34d399" strokeWidth="2.5" />
               <line x1="1" y1="18" x2="47" y2="18" stroke="#34d399" strokeWidth="2.5" />
               <circle cx="38" cy="28" r="3" fill="#34d399" />
