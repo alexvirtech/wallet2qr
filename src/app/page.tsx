@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { useSession as useAuthSession } from "next-auth/react";
 import SignInButtons from "@/components/SignInButtons";
+import { providerDisplayName } from "@/components/SignInButtons";
 import { decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
@@ -24,7 +25,6 @@ function DeepLinkHandler() {
 
   const isV2 = v === "2";
   const isSignedIn = authStatus === "authenticated";
-  const providerName = pep === "apple" ? "Apple" : "Google";
 
   const [password, setPassword] = useState(pw ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +105,7 @@ function DeepLinkHandler() {
         {isV2 && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
             <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-              This wallet is bound to a {providerName} account.
+              This wallet is bound to a {providerDisplayName(pep ?? "google")} account.
             </p>
             {!isSignedIn && (
               <div className="space-y-2">
@@ -116,9 +116,14 @@ function DeepLinkHandler() {
               </div>
             )}
             {isSignedIn && (
-              <p className="text-xs text-m-green">
-                Signed in as {authSession?.user?.email}
-              </p>
+              <div className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span className="text-xs text-green-700 dark:text-green-300">
+                  Signed in as <strong>{authSession?.user?.email}</strong>
+                </span>
+              </div>
             )}
           </div>
         )}
@@ -167,10 +172,72 @@ function DeepLinkHandler() {
   );
 }
 
+function TwoLayerSection() {
+  return (
+    <section className="pb-12 sm:pb-16">
+      <div className="text-center mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold mb-3">
+          Two Layers of Protection
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
+          Wallet2QR secures your mnemonic with dual-layer encryption.
+          Both layers must be present to unlock your wallet.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+        <div className="rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-b from-blue-50/50 to-white dark:from-blue-950/20 dark:to-m-blue-dark-2 p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                <rect x="5" y="11" width="14" height="10" rx="2" />
+                <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">Layer 1: Password</h3>
+              <p className="text-[11px] text-gray-400">AES-256-CBC encryption</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            Your mnemonic is encrypted with a password you choose. The QR code contains
+            only encrypted data — it&apos;s meaningless without the password.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-b from-purple-50/50 to-white dark:from-purple-950/20 dark:to-m-blue-dark-2 p-6">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-500">
+                <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">Layer 2: Account Binding</h3>
+              <p className="text-[11px] text-gray-400">HKDF-SHA256 second factor</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            A unique cryptographic key is derived from your Google, Apple, GitHub, or Microsoft
+            account. Even with the QR and password, decryption requires your account.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 mt-6 text-xs text-gray-400">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-500">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span>QR code + Password + Account = maximum security</span>
+      </div>
+    </section>
+  );
+}
+
 function FlowInfographic() {
   return (
     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-2 py-4">
-      {/* Mnemonic */}
       <div className="flex flex-col items-center gap-2 w-28">
         <div className="w-16 h-16 rounded-2xl bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
@@ -188,7 +255,6 @@ function FlowInfographic() {
         <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
 
-      {/* Lock / Encrypt */}
       <div className="flex flex-col items-center gap-2 w-28">
         <div className="w-16 h-16 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 flex items-center justify-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
@@ -205,7 +271,6 @@ function FlowInfographic() {
         <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
 
-      {/* QR Code */}
       <div className="flex flex-col items-center gap-2 w-28">
         <div className="w-16 h-16 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 flex items-center justify-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-purple-500">
@@ -229,7 +294,6 @@ function FlowInfographic() {
         <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
 
-      {/* Scan */}
       <div className="flex flex-col items-center gap-2 w-28">
         <div className="w-16 h-16 rounded-2xl bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
@@ -248,7 +312,6 @@ function FlowInfographic() {
         <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
       </svg>
 
-      {/* Wallet */}
       <div className="flex flex-col items-center gap-2 w-28">
         <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
@@ -347,13 +410,13 @@ function LandingContent() {
           Your crypto wallet,
           <br />
           <span className="text-m-blue-light-5 dark:text-m-blue-light-4">
-            sealed in a QR code
+            double-locked in a QR code
           </span>
         </h1>
         <p className="text-base sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto mb-8">
-          Encrypt any BIP-39 mnemonic into a password-protected QR code.
-          Scan it back anytime to access a lightweight multi-chain wallet —
-          no installs, no extensions, no secrets stored.
+          Encrypt any BIP-39 mnemonic with a password and bind it to your Google,
+          Apple, GitHub, or Microsoft account. Two layers of protection — even
+          if someone finds your QR code, they still need both your password and your account.
         </p>
         <FlowInfographic />
         <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
@@ -372,6 +435,9 @@ function LandingContent() {
         </div>
       </section>
 
+      {/* Two layers — security-first */}
+      <TwoLayerSection />
+
       {/* How it works */}
       <section className="pb-12 sm:pb-16">
         <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">
@@ -382,8 +448,8 @@ function LandingContent() {
             <div className="text-3xl mb-3">1</div>
             <h3 className="font-bold mb-2">Encrypt</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your BIP-39 mnemonic and a password. wallet2qr encrypts it
-              with AES-256-CBC and renders a QR code.
+              Enter your mnemonic, set a password, and sign in with your account.
+              Wallet2QR encrypts with AES-256 using both factors and renders a QR code.
             </p>
           </div>
           <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6 text-center">
@@ -391,21 +457,21 @@ function LandingContent() {
             <h3 className="font-bold mb-2">Store</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Print the QR code or save the image. The encrypted data is
-              self-contained — no server, no cloud, no account needed.
+              self-contained — no server stores your mnemonic or keys.
             </p>
           </div>
           <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6 text-center">
             <div className="text-3xl mb-3">3</div>
-            <h3 className="font-bold mb-2">Scan & Use</h3>
+            <h3 className="font-bold mb-2">Scan & Unlock</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Scan the QR with your phone camera to open wallet2qr with
-              your encrypted wallet. Enter your password to unlock.
+              Scan the QR with your phone camera. Sign in with the same account,
+              enter your password — both are required to unlock the wallet.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Security & Audit — central position */}
+      {/* Security & Audit */}
       <SecuritySection />
 
       {/* Features */}
@@ -416,12 +482,12 @@ function LandingContent() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             {
-              title: "Multi-Chain Support",
-              desc: "Bitcoin, Ethereum, Arbitrum, BNB Chain, Avalanche, and Solana. View balances, send, receive, and exchange across chains.",
+              title: "Two-Factor QR Encryption",
+              desc: "Password + account binding. Your QR can't be decrypted without both — even if someone finds it and guesses your password.",
             },
             {
-              title: "Cross-Chain Exchange",
-              desc: "Swap tokens across supported chains via LI.FI aggregation — directly from your browser wallet.",
+              title: "Multi-Chain Support",
+              desc: "Bitcoin, Ethereum, Arbitrum, BNB Chain, Avalanche, and Solana. View balances, send, receive, and exchange across chains.",
             },
             {
               title: "Zero Storage",
@@ -432,8 +498,8 @@ function LandingContent() {
               desc: "Each QR encodes a URL. Scan it with any phone camera to open wallet2qr and decrypt — no app install required.",
             },
             {
-              title: "Offline Encryption",
-              desc: "AES-256-CBC encryption runs entirely in your browser. Compatible with the text2qr family of tools.",
+              title: "Cross-Chain Exchange",
+              desc: "Swap tokens across supported chains via LI.FI aggregation — directly from your browser wallet.",
             },
             {
               title: "Auto-Lock",

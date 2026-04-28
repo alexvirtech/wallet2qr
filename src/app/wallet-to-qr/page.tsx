@@ -20,7 +20,7 @@ export default function WalletToQrPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [bindAccount, setBindAccount] = useState(false);
+  const [bindAccount, setBindAccount] = useState(true);
   const [encrypting, setEncrypting] = useState(false);
   const { setSession } = useSession();
   const router = useRouter();
@@ -28,6 +28,7 @@ export default function WalletToQrPage() {
 
   const isSignedIn = authStatus === "authenticated";
   const pepperRef = { current: "" };
+  const boundProviderRef = { current: "" };
 
   const handleEncrypt = useCallback(
     async (e: React.FormEvent) => {
@@ -55,13 +56,14 @@ export default function WalletToQrPage() {
 
       if (bindAccount) {
         if (!isSignedIn) {
-          setError("Please sign in first");
+          setError("Please sign in with a provider first");
           return;
         }
         setEncrypting(true);
         try {
           const { provider, sub_hash, pepper } = await fetchPepper();
           pepperRef.current = pepper;
+          boundProviderRef.current = provider;
           const qrUrl = buildQrUrlV2(trimmed, password, pepper, provider, sub_hash);
           setQrData(qrUrl);
         } catch (err) {
@@ -106,8 +108,9 @@ export default function WalletToQrPage() {
     setQrData(null);
     setError(null);
     setTestResult(null);
-    setBindAccount(false);
+    setBindAccount(true);
     pepperRef.current = "";
+    boundProviderRef.current = "";
   }, []);
 
   const canSubmit = !encrypting && (!bindAccount || isSignedIn);
@@ -157,7 +160,7 @@ export default function WalletToQrPage() {
         </div>
 
         {!qrData && (
-          <div className={`rounded-xl border transition-colors ${bindAccount ? "border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20" : "border-gray-200 dark:border-gray-700"} p-4 space-y-3`}>
+          <div className={`rounded-xl border transition-colors ${bindAccount ? "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/20" : "border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/20"} p-4 space-y-3`}>
             <label className="flex items-start gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -167,36 +170,55 @@ export default function WalletToQrPage() {
               />
               <div>
                 <span className="text-sm font-bold text-gray-700 dark:text-gray-200 block">
-                  Bind to my account
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  Adds a second factor — only your account + password can decrypt this QR.
+                  Bind to my account (recommended)
                 </span>
               </div>
             </label>
 
-            {bindAccount && (
+            {bindAccount ? (
               <div className="ml-7 space-y-3">
+                <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                  Choose a provider to bind this QR to your account
+                </p>
+
                 {!isSignedIn ? (
-                  <>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Choose a provider to bind this QR to your account:
-                    </p>
-                    <SignInButtons />
-                  </>
+                  <SignInButtons activeProviderId={null} />
                 ) : (
-                  <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    <span className="text-xs text-green-700 dark:text-green-300">
-                      Signed in as <strong>{authSession?.user?.email}</strong>
-                      {authSession?.provider && (
-                        <span className="text-green-600 dark:text-green-400"> via {providerDisplayName(authSession.provider)}</span>
-                      )}
-                    </span>
-                  </div>
+                  <>
+                    <SignInButtons activeProviderId={authSession?.provider} />
+                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span className="text-xs text-green-700 dark:text-green-300">
+                        Signed in as <strong>{authSession?.user?.email}</strong>
+                        {authSession?.provider && (
+                          <span className="text-green-600 dark:text-green-400"> via {providerDisplayName(authSession.provider)}</span>
+                        )}
+                      </span>
+                    </div>
+                  </>
                 )}
+
+                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                  Two-layer protection: your QR code is encrypted with AES-256 using your password,
+                  and a unique key derived from your account acts as a second factor. Even if someone
+                  has the QR and your password, they cannot decrypt it without access to your account.
+                </p>
+              </div>
+            ) : (
+              <div className="ml-7">
+                <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <p className="text-xs leading-relaxed">
+                    Without account binding, anyone who obtains your QR code and password can access
+                    your wallet. Binding to an account adds a second factor that makes this significantly harder.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -205,9 +227,30 @@ export default function WalletToQrPage() {
         {error && <p className="text-m-red text-sm">{error}</p>}
 
         {qrData && (
-          <div className="mt-4">
-            <QrCanvas data={qrData} />
-          </div>
+          <>
+            <div className="mt-4">
+              <QrCanvas data={qrData} />
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-4">
+              <div className="flex items-start gap-2.5">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed space-y-1">
+                  <p className="font-bold">Save this QR code securely and remember your password.</p>
+                  <p>
+                    Losing the QR code, forgetting your password
+                    {bindAccount ? ", or losing access to your " + providerDisplayName(boundProviderRef.current || authSession?.provider || "") + " account" : ""}
+                    {" "}will result in permanent loss of access to your funds. Never share these with anyone
+                    — a third party with your QR{bindAccount ? ", password, and account access" : " and password"} can take full control of your wallet.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {testResult && (

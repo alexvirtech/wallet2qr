@@ -2,7 +2,7 @@
 
 import { signIn } from "next-auth/react";
 
-const providers = [
+export const providers = [
   {
     id: "google",
     label: "Google",
@@ -14,27 +14,24 @@ const providers = [
         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
       </svg>
     ),
-    className: "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600",
   },
   {
     id: "apple",
     label: "Apple",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-gray-700 dark:text-gray-200">
         <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
       </svg>
     ),
-    className: "bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200",
   },
   {
     id: "github",
     label: "GitHub",
     icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-gray-700 dark:text-gray-200">
         <path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.02-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.02 1.6 1.02 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/>
       </svg>
     ),
-    className: "bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300",
   },
   {
     id: "microsoft-entra-id",
@@ -47,7 +44,6 @@ const providers = [
         <rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#FFB900"/>
       </svg>
     ),
-    className: "bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600",
   },
 ] as const;
 
@@ -55,9 +51,10 @@ interface SignInButtonsProps {
   callbackUrl?: string;
   onBeforeSignIn?: () => void;
   compact?: boolean;
+  activeProviderId?: string | null;
 }
 
-export default function SignInButtons({ callbackUrl, onBeforeSignIn, compact }: SignInButtonsProps) {
+export default function SignInButtons({ callbackUrl, onBeforeSignIn, compact, activeProviderId }: SignInButtonsProps) {
   const handleSignIn = (providerId: string) => {
     onBeforeSignIn?.();
     signIn(providerId, callbackUrl ? { callbackUrl } : undefined);
@@ -66,35 +63,49 @@ export default function SignInButtons({ callbackUrl, onBeforeSignIn, compact }: 
   if (compact) {
     return (
       <div className="flex flex-wrap gap-2">
-        {providers.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => handleSignIn(p.id)}
-            className={`inline-flex items-center gap-1.5 text-xs font-bold py-1.5 px-3 rounded-md transition-colors ${p.className}`}
-            title={`Sign in with ${p.label}`}
-          >
-            {p.icon}
-            <span>{p.label}</span>
-          </button>
-        ))}
+        {providers.map((p) => {
+          const active = p.id === activeProviderId;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => handleSignIn(p.id)}
+              className={`inline-flex items-center gap-1.5 text-xs font-bold py-1.5 px-3 rounded-md border transition-colors ${
+                active
+                  ? "border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 ring-1 ring-green-400/50"
+                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+              } text-gray-700 dark:text-gray-200`}
+              title={`Sign in with ${p.label}`}
+            >
+              {p.icon}
+              <span>{p.label}</span>
+            </button>
+          );
+        })}
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {providers.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          onClick={() => handleSignIn(p.id)}
-          className={`flex items-center justify-center gap-2 text-sm font-bold py-2 px-3 rounded-lg transition-colors ${p.className}`}
-        >
-          {p.icon}
-          <span>{p.label}</span>
-        </button>
-      ))}
+      {providers.map((p) => {
+        const active = p.id === activeProviderId;
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => handleSignIn(p.id)}
+            className={`flex items-center justify-center gap-2 text-sm font-bold py-2.5 px-3 rounded-lg border transition-all ${
+              active
+                ? "border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-400/50 shadow-sm"
+                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 hover:shadow-sm"
+            } text-gray-700 dark:text-gray-200`}
+          >
+            {p.icon}
+            <span>{p.label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
