@@ -235,77 +235,113 @@ function TwoLayerSection() {
   );
 }
 
-function FlowInfographic() {
+function FlowArrow({ flip }: { flip?: boolean }) {
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3 py-4 max-w-2xl mx-auto">
-      {/* Mnemonic */}
-      <div className="flex flex-col items-center gap-1 w-16 sm:w-20">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500 sm:w-6 sm:h-6">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="7" y1="9" x2="17" y2="9" />
-            <line x1="7" y1="13" x2="14" y2="13" />
-          </svg>
-        </div>
-        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Mnemonic</span>
+    <svg width="28" height="16" viewBox="0 0 28 16" className="text-gray-300 dark:text-gray-600 flex-shrink-0">
+      {flip ? (
+        <>
+          <line x1="28" y1="8" x2="6" y2="8" stroke="currentColor" strokeWidth="2" />
+          <polyline points="10,3 2,8 10,13" fill="none" stroke="currentColor" strokeWidth="2" />
+        </>
+      ) : (
+        <>
+          <line x1="0" y1="8" x2="20" y2="8" stroke="currentColor" strokeWidth="2" />
+          <polyline points="16,3 24,8 16,13" fill="none" stroke="currentColor" strokeWidth="2" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function FlowIcon({ bg, children, label }: { bg: string; children: React.ReactNode; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className={`w-14 h-14 rounded-2xl ${bg} flex items-center justify-center`}>
+        {children}
       </div>
+      <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">{label}</span>
+    </div>
+  );
+}
 
-      {/* Arrow */}
-      <svg width="16" height="12" viewBox="0 0 16 12" className="text-gray-300 dark:text-gray-600 flex-shrink-0">
-        <line x1="0" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="2" />
-        <polyline points="8,2 14,6 8,10" fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
-
-      {/* Two-layer encryption box */}
-      <div className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-m-blue-dark-3/50 px-2.5 py-2 sm:px-4 sm:py-2.5">
-        <div className="text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-400 text-center mb-1.5 font-bold">Encrypt</div>
-        <div className="flex gap-2 sm:gap-3">
-          <div className="flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-m-blue-dark-2 px-2 py-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500 flex-shrink-0">
-              <rect x="5" y="11" width="14" height="10" rx="2" />
-              <path d="M8 11V7a4 4 0 1 1 8 0v4" />
-            </svg>
-            <div>
-              <div className="text-[10px] sm:text-[11px] font-bold text-blue-600 dark:text-blue-400 leading-tight">Password</div>
-              <div className="text-[8px] sm:text-[9px] text-gray-400 leading-tight">AES-256</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-m-blue-dark-2 px-2 py-1.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-purple-500 flex-shrink-0">
-              <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-            <div>
-              <div className="text-[10px] sm:text-[11px] font-bold text-purple-600 dark:text-purple-400 leading-tight">Account</div>
-              <div className="text-[8px] sm:text-[9px] text-gray-400 leading-tight">HKDF</div>
-            </div>
+function TwoLayerBox({ title, borderColor }: { title: string; borderColor: string }) {
+  return (
+    <div className={`rounded-xl border-2 border-dashed ${borderColor} bg-gray-50/50 dark:bg-m-blue-dark-3/50 px-3 py-2.5 sm:px-5`}>
+      <div className="text-[9px] uppercase tracking-wider text-gray-400 text-center mb-2 font-bold">{title}</div>
+      <div className="flex gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-m-blue-dark-2 px-2.5 py-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500 flex-shrink-0">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+          </svg>
+          <div>
+            <div className="text-xs font-bold text-blue-600 dark:text-blue-400 leading-tight">Password</div>
+            <div className="text-[9px] text-gray-400 leading-tight">AES-256</div>
           </div>
         </div>
+        <div className="flex items-center gap-2 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-m-blue-dark-2 px-2.5 py-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-purple-500 flex-shrink-0">
+            <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+          <div>
+            <div className="text-xs font-bold text-purple-600 dark:text-purple-400 leading-tight">Account</div>
+            <div className="text-[9px] text-gray-400 leading-tight">HKDF</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlowInfographic() {
+  const mnemonicIcon = (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <line x1="7" y1="9" x2="17" y2="9" />
+      <line x1="7" y1="13" x2="14" y2="13" />
+    </svg>
+  );
+  const qrIcon = (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" className="text-green-500">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="3" height="3" rx="0.5" />
+      <rect x="18" y="14" width="3" height="3" rx="0.5" />
+      <rect x="14" y="18" width="3" height="3" rx="0.5" />
+      <rect x="18" y="18" width="3" height="3" rx="0.5" />
+      <rect x="5" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
+      <rect x="16" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
+      <rect x="5" y="16" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
+    </svg>
+  );
+  const walletIcon = (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <circle cx="17" cy="15" r="1.5" />
+    </svg>
+  );
+
+  return (
+    <div className="flex flex-col gap-4 py-3 max-w-2xl mx-auto">
+      {/* Row 1: Mnemonic → Encrypt → QR */}
+      <div className="flex items-center justify-center gap-2 sm:gap-3">
+        <FlowIcon bg="bg-blue-500/10 dark:bg-blue-400/10" label="Mnemonic">{mnemonicIcon}</FlowIcon>
+        <FlowArrow />
+        <TwoLayerBox title="Encrypt" borderColor="border-gray-200 dark:border-gray-700" />
+        <FlowArrow />
+        <FlowIcon bg="bg-green-500/10 dark:bg-green-400/10" label="QR Code">{qrIcon}</FlowIcon>
       </div>
 
-      {/* Arrow */}
-      <svg width="16" height="12" viewBox="0 0 16 12" className="text-gray-300 dark:text-gray-600 flex-shrink-0">
-        <line x1="0" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="2" />
-        <polyline points="8,2 14,6 8,10" fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
-
-      {/* QR Code */}
-      <div className="flex flex-col items-center gap-1 w-16 sm:w-20">
-        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-green-500 sm:w-6 sm:h-6">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="3" height="3" rx="0.5" />
-            <rect x="18" y="14" width="3" height="3" rx="0.5" />
-            <rect x="14" y="18" width="3" height="3" rx="0.5" />
-            <rect x="18" y="18" width="3" height="3" rx="0.5" />
-            <rect x="5" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
-            <rect x="16" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
-            <rect x="5" y="16" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
-          </svg>
-        </div>
-        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">QR Code</span>
+      {/* Row 2: QR → Decrypt → Wallet */}
+      <div className="flex items-center justify-center gap-2 sm:gap-3">
+        <FlowIcon bg="bg-green-500/10 dark:bg-green-400/10" label="Scan QR">{qrIcon}</FlowIcon>
+        <FlowArrow />
+        <TwoLayerBox title="Decrypt" borderColor="border-gray-200 dark:border-gray-700" />
+        <FlowArrow />
+        <FlowIcon bg="bg-emerald-500/10 dark:bg-emerald-400/10" label="Wallet">{walletIcon}</FlowIcon>
       </div>
     </div>
   );
@@ -389,21 +425,20 @@ function LandingContent() {
   return (
     <div className="w-full max-w-3xl mx-auto px-4 sm:px-6">
       {/* Hero */}
-      <section className="py-12 sm:py-20 text-center">
-        <h1 className="text-3xl sm:text-5xl font-bold mb-4 leading-tight">
-          Your crypto wallet,
-          <br />
+      <section className="pt-6 sm:pt-10 pb-8 sm:pb-12 text-center">
+        <h1 className="text-2xl sm:text-4xl font-bold mb-2 leading-tight">
+          Your crypto wallet,{" "}
           <span className="text-m-blue-light-5 dark:text-m-blue-light-4">
             double-locked in a QR code
           </span>
         </h1>
-        <p className="text-base sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto mb-8">
-          Encrypt any BIP-39 mnemonic with a password and bind it to your Google,
-          Apple, GitHub, or Microsoft account. Two layers of protection — even
-          if someone finds your QR code, they still need both your password and your account.
+        <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 max-w-lg mx-auto mb-4">
+          Encrypt your BIP-39 mnemonic with a password and bind it to your
+          Google, Apple, GitHub, or Microsoft account. Two layers &mdash; even with
+          the QR, they need both your password and your account.
         </p>
         <FlowInfographic />
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-5">
           <a
             href="/wallet-to-qr"
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-sm"
