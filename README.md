@@ -32,9 +32,66 @@ QR codes produced by wallet2qr are fully compatible with text2qr, text2qrApp, te
 - Tailwind CSS v4
 - viem (EVM interactions)
 - @scure/bip39 + @scure/bip32 (key derivation)
-- CryptoJS (AES-CBC — compatibility with text2qrApp)
+- Argon2id via hash-wasm (v3 key derivation)
+- AES-256-GCM via WebCrypto (v3 encryption)
+- CryptoJS (AES-CBC — legacy v1/v2 compatibility)
 - qrcode + jsqr + qr-scanner (QR encode/decode)
 - @lifi/sdk (cross-chain swaps)
+- NextAuth v5 with Google, Apple, GitHub, Microsoft Entra ID
+
+## Encryption Architecture
+
+### v3 (current) — Argon2id + AES-256-GCM
+
+v3 uses client-side key derivation with **Argon2id** (64 MB, 3 iterations) and **AES-256-GCM** via the WebCrypto API. OAuth tokens are **never** used as encryption keys — only stable provider identifiers (Google `sub`, GitHub numeric `id`, Microsoft `oid`) are mixed into the key derivation. These identifiers never change, regardless of OAuth token or client secret expiration.
+
+**Four encryption modes:**
+
+| Mode | Factors | Description |
+|------|---------|-------------|
+| A | Password | Basic single-factor |
+| B | Password + social account | Two-factor with provider stable ID |
+| C | Password + backup code | Two-factor with recovery code |
+| D | Password + social + backup | Strongest — social login with backup fallback |
+
+**Mode D (recommended)** uses DEK-wrapping: a random Data Encryption Key encrypts the mnemonic, then the DEK is wrapped with two independent keys — one derived from `password + providerStableId`, one from `password + backupCode`. Either path can unwrap the DEK and decrypt the wallet.
+
+**Recovery scenarios:**
+- Social account available → sign in + password → decrypt
+- Social account lost → backup code + password → decrypt
+- Both backup code and social account lost → **unrecoverable** (by design)
+
+### QR payload metadata (v3)
+
+Each v3 QR code encodes a URL with these parameters:
+- `v=3` — encryption version
+- `ds` — AES-256-GCM ciphertext (base64url)
+- `s` — random 16-byte Argon2id salt (base64url)
+- `m` — encryption mode (a/b/c/d)
+- `p` — provider name (google, github, etc.) — modes b/d only
+- `ph` — SHA-256 hash of provider stable ID, truncated — for account verification
+- `w1`, `w2` — wrapped DEK blobs — mode d only
+- `ct` — creation timestamp
+
+Raw provider IDs are never stored in the QR. Only a truncated hash is included for verification.
+
+### Legacy versions (v1, v2)
+
+- **v1** (no `v` param): CryptoJS AES-256-CBC, password-only. Compatible with text2qr family.
+- **v2** (`v=2`): CryptoJS AES-256-CBC with server-side HKDF pepper. Requires `WALLET2QR_PEPPER_MASTER` env var.
+
+Both legacy formats remain fully supported for decryption.
+
+### Threat model
+
+| Threat | Mitigation |
+|--------|------------|
+| QR code stolen | Encrypted with Argon2id-derived key — useless without password (+ account/backup) |
+| Password guessed | Argon2id with 64 MB memory makes brute-force impractical |
+| OAuth token/secret expires | Not used for encryption — stable provider IDs persist indefinitely |
+| Social account compromised | Attacker still needs QR code + password |
+| QR + password + wrong account | Provider ID hash mismatch blocks decryption |
+| Backup code leaked | Attacker still needs QR code + password |
 
 ## Security
 
@@ -49,3 +106,6 @@ Key safeguards:
 - Auto-lock after 5 minutes of inactivity
 - Content-Security-Policy headers configured
 - Password strength requirements enforced on encryption
+- Argon2id with OWASP-recommended parameters (64 MB, 3 iterations)
+- AES-256-GCM authenticated encryption (tamper detection)
+- Sensitive key material wiped from memory after use

@@ -31,7 +31,7 @@ export default function RootLayout({
         <SessionProvider>
           <SettingsProvider>
             <WalletConnectProvider>
-            <div className="min-h-screen flex flex-col">
+            <div className="min-h-screen flex flex-col overflow-x-hidden">
               <Nav />
               <main className="flex-1">{children}</main>
               <footer className="text-center text-xs text-gray-400 dark:text-gray-500 py-4">

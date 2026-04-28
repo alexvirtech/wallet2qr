@@ -10,6 +10,8 @@ import { decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
+import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
+import type { EncryptionMode } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
 
 function DeepLinkHandler() {
@@ -22,15 +24,31 @@ function DeepLinkHandler() {
   const roParam = searchParams.get("readOnly");
   const v = searchParams.get("v");
   const pep = searchParams.get("pep");
+  const salt = searchParams.get("s");
+  const encMode = searchParams.get("m") as EncryptionMode | null;
+  const provider = searchParams.get("p");
+  const ph = searchParams.get("ph");
+  const w1 = searchParams.get("w1");
+  const w2 = searchParams.get("w2");
 
   const isV2 = v === "2";
+  const isV3 = v === "3";
   const isSignedIn = authStatus === "authenticated";
+  const providerSub = authSession?.providerSub ?? authSession?.sub;
 
   const [password, setPassword] = useState(pw ?? "");
+  const [backupCode, setBackupCode] = useState("");
+  const [useBackup, setUseBackup] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [autoAttempted, setAutoAttempted] = useState(false);
   const [readOnly, setReadOnly] = useState(roParam === "1");
+
+  const v3NeedsAccount = isV3 && (encMode === "b" || encMode === "d") && !useBackup;
+  const v3NeedsBackup = isV3 && (encMode === "c" || (encMode === "d" && useBackup));
+  const v3AccountMismatch = v3NeedsAccount && isSignedIn && providerSub && ph
+    ? computeProviderIdHash(providerSub) !== ph
+    : false;
 
   const handleDecrypt = useCallback(async (pwd?: string) => {
     const pass = pwd ?? password;
@@ -38,6 +56,55 @@ function DeepLinkHandler() {
       setError("Enter your password to decrypt.");
       return;
     }
+
+    // v3 decrypt
+    if (isV3 && salt && encMode) {
+      if (v3NeedsAccount && !isSignedIn) {
+        setError("Please sign in first.");
+        return;
+      }
+      if (v3NeedsBackup && !backupCode.trim()) {
+        setError("Enter your backup recovery code.");
+        return;
+      }
+
+      setDecrypting(true);
+      setError(null);
+
+      try {
+        const decrypted = await decryptV3(ds, pass, salt, {
+          mode: encMode,
+          providerStableId: v3NeedsAccount && providerSub ? providerSub : undefined,
+          backupCode: v3NeedsBackup ? backupCode.trim() : undefined,
+          wrappedKey1B64: w1 ?? undefined,
+          wrappedKey2B64: w2 ?? undefined,
+        });
+
+        if (!decrypted) {
+          setError("Decryption failed — wrong password" +
+            (v3NeedsAccount ? ", wrong account" : "") +
+            (v3NeedsBackup ? ", or wrong backup code" : "") + ".");
+          setDecrypting(false);
+          return;
+        }
+
+        const validation = validateBip39Mnemonic(decrypted);
+        if (!validation.valid) {
+          setError("Decryption produced invalid data.");
+          setDecrypting(false);
+          return;
+        }
+
+        setSession(decrypted, pass, readOnly);
+        router.push("/wallet");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Decryption failed");
+        setDecrypting(false);
+      }
+      return;
+    }
+
+    // v2 decrypt
     if (isV2 && !isSignedIn) {
       setError("Please sign in first.");
       return;
@@ -80,18 +147,20 @@ function DeepLinkHandler() {
       setError(err instanceof Error ? err.message : "Decryption failed");
       setDecrypting(false);
     }
-  }, [ds, password, readOnly, isV2, isSignedIn, setSession, router]);
+  }, [ds, password, readOnly, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, w1, w2, setSession, router]);
 
   useEffect(() => {
-    if (ds && pw && !autoAttempted && !isV2) {
+    if (ds && pw && !autoAttempted && !isV2 && !isV3) {
       setAutoAttempted(true);
       handleDecrypt(pw);
     }
-  }, [ds, pw, autoAttempted, isV2, handleDecrypt]);
+  }, [ds, pw, autoAttempted, isV2, isV3, handleDecrypt]);
 
   if (!ds) return null;
 
-  const canDecrypt = !decrypting && (!isV2 || isSignedIn);
+  const canDecrypt = !decrypting &&
+    (!isV2 || isSignedIn) &&
+    (!v3NeedsAccount || (isSignedIn && !v3AccountMismatch));
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-12">
@@ -102,6 +171,49 @@ function DeepLinkHandler() {
           decrypt and open it.
         </p>
 
+        {/* v3 account-bound notice */}
+        {isV3 && (encMode === "b" || encMode === "d") && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
+            <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+              This wallet is bound to a {providerDisplayName(provider ?? "")} account.
+            </p>
+            {encMode === "d" && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setUseBackup(false)}
+                  className={`text-xs font-bold py-1 px-3 rounded border ${!useBackup ? "border-blue-400 bg-blue-100 dark:bg-blue-900/40 text-blue-700" : "border-gray-300 text-gray-500"}`}
+                >
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUseBackup(true)}
+                  className={`text-xs font-bold py-1 px-3 rounded border ${useBackup ? "border-amber-400 bg-amber-100 dark:bg-amber-900/40 text-amber-700" : "border-gray-300 text-gray-500"}`}
+                >
+                  Use backup code
+                </button>
+              </div>
+            )}
+            {!useBackup && !isSignedIn && (
+              <div className="space-y-2">
+                <p className="text-xs text-blue-600 dark:text-blue-400">Sign in with the original account to decrypt.</p>
+                <SignInButtons callbackUrl={typeof window !== "undefined" ? window.location.href : "/"} compact />
+              </div>
+            )}
+            {!useBackup && isSignedIn && !v3AccountMismatch && (
+              <div className="flex items-center gap-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span className="text-xs text-green-700 dark:text-green-300">Signed in as <strong>{authSession?.user?.email}</strong></span>
+              </div>
+            )}
+            {!useBackup && v3AccountMismatch && (
+              <p className="text-sm text-red-600 font-bold">This QR was bound to a different account.</p>
+            )}
+          </div>
+        )}
+
+        {/* v2 (legacy) notice */}
         {isV2 && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
             <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
@@ -109,29 +221,21 @@ function DeepLinkHandler() {
             </p>
             {!isSignedIn && (
               <div className="space-y-2">
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  Sign in with the original account to decrypt.
-                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">Sign in with the original account to decrypt.</p>
                 <SignInButtons callbackUrl={typeof window !== "undefined" ? window.location.href : "/"} compact />
               </div>
             )}
             {isSignedIn && (
               <div className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span className="text-xs text-green-700 dark:text-green-300">
-                  Signed in as <strong>{authSession?.user?.email}</strong>
-                </span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span className="text-xs text-green-700 dark:text-green-300">Signed in as <strong>{authSession?.user?.email}</strong></span>
               </div>
             )}
           </div>
         )}
 
         <div>
-          <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
-            Password
-          </label>
+          <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">Password</label>
           <input
             type="password"
             value={password}
@@ -143,6 +247,20 @@ function DeepLinkHandler() {
           />
         </div>
 
+        {/* Backup code input for v3 */}
+        {v3NeedsBackup && (
+          <div>
+            <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">Backup Recovery Code</label>
+            <input
+              type="text"
+              value={backupCode}
+              onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
+              placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+              className="mt-1 px-3 py-2 border border-gray-300 rounded-lg w-full font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
+            />
+          </div>
+        )}
+
         <label className="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
@@ -150,12 +268,8 @@ function DeepLinkHandler() {
             onChange={(e) => setReadOnly(e.target.checked)}
             className="rounded border-gray-300 dark:border-gray-600"
           />
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            Read-only mode
-          </span>
-          <span className="text-xs text-gray-400">
-            (view balances only)
-          </span>
+          <span className="text-sm text-gray-600 dark:text-gray-300">Read-only mode</span>
+          <span className="text-xs text-gray-400">(view balances only)</span>
         </label>
 
         {error && <p className="text-m-red text-sm">{error}</p>}
@@ -235,93 +349,128 @@ function TwoLayerSection() {
   );
 }
 
-function FlowInfographic() {
+function FlowRow({ mode }: { mode: "encrypt" | "decrypt" }) {
+  const isEncrypt = mode === "encrypt";
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-2 py-4">
-      <div className="flex flex-col items-center gap-2 w-28">
-        <div className="w-16 h-16 rounded-2xl bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-            <rect x="3" y="4" width="18" height="16" rx="2" />
-            <line x1="7" y1="9" x2="17" y2="9" />
-            <line x1="7" y1="13" x2="14" y2="13" />
-            <line x1="7" y1="17" x2="11" y2="17" />
-          </svg>
+    <div className="flex items-start justify-between">
+      <div className="flex flex-col items-center">
+        <div className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
+          {isEncrypt ? (
+            <svg viewBox="0 0 36 48" className="w-8 h-11 sm:w-10 sm:h-[52px]" fill="none" shapeRendering="geometricPrecision">
+              <rect width="36" height="48" rx="4" stroke="#34d399" strokeWidth="2.5" />
+              <line x1="7" y1="14" x2="29" y2="14" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
+              <line x1="7" y1="23" x2="29" y2="23" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
+              <line x1="7" y1="32" x2="22" y2="32" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 48 48" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" shapeRendering="geometricPrecision">
+              <rect x="0" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
+              <rect x="28" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
+              <rect x="0" y="28" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
+              <rect x="6" y="6" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="34" y="6" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="6" y="34" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="29" y="29" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="40" y="29" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="29" y="40" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="40" y="40" width="8" height="8" rx="1.5" fill="#34d399" />
+            </svg>
+          )}
         </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Mnemonic</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1.5">{isEncrypt ? "Mnemonic" : "QR Code"}</span>
       </div>
 
-      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
-        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
-        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
-
-      <div className="flex flex-col items-center gap-2 w-28">
-        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 dark:bg-amber-400/10 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500">
-            <rect x="5" y="11" width="14" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 1 1 8 0v4" />
-            <circle cx="12" cy="16" r="1.5" />
-          </svg>
-        </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Encrypt</span>
+      <div className="flex h-[60px] sm:h-[76px] items-center">
+        <svg viewBox="0 0 24 14" className="w-6 sm:w-7 h-auto text-gray-300 dark:text-gray-600" fill="none">
+          <path d="M0 7h18m-6-6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </div>
 
-      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
-        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
-        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
-
-      <div className="flex flex-col items-center gap-2 w-28">
-        <div className="w-16 h-16 rounded-2xl bg-purple-500/10 dark:bg-purple-400/10 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-purple-500">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="3" height="3" rx="0.5" />
-            <rect x="18" y="14" width="3" height="3" rx="0.5" />
-            <rect x="14" y="18" width="3" height="3" rx="0.5" />
-            <rect x="18" y="18" width="3" height="3" rx="0.5" />
-            <rect x="5" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
-            <rect x="16" y="5" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
-            <rect x="5" y="16" width="3" height="3" rx="0.5" className="text-white dark:text-m-blue-dark-2" />
-          </svg>
+      <div className="flex flex-col items-center">
+        <div className="flex gap-1">
+          <div className="w-[52px] h-[52px] sm:w-16 sm:h-16 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+            <svg viewBox="0 0 32 36" className="w-8 h-9 sm:w-9 sm:h-10" fill="none" shapeRendering="geometricPrecision">
+              <rect x="0" y="14" width="32" height="22" rx="3" stroke="#3b82f6" strokeWidth="2.5" />
+              <path d="M5 14V8a11 11 0 0 1 22 0v6" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+              <circle cx="16" cy="25" r="3" fill="#3b82f6" />
+            </svg>
+          </div>
+          <div className="w-[52px] h-[52px] sm:w-16 sm:h-16 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
+            <svg viewBox="0 0 32 42" className="w-8 h-10 sm:w-9 sm:h-11" fill="none" shapeRendering="geometricPrecision">
+              <path d="M16 2l14 9v10c0 10-6.5 18.5-14 21C7.5 39.5 1 31 1 21V11L16 2z" stroke="#a855f7" strokeWidth="2.5" />
+              <polyline points="10,23 14,27 22,19" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </div>
         </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">QR Code</span>
+        <div className="flex gap-1 mt-1">
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium w-[52px] sm:w-16 text-center">Password</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium w-[52px] sm:w-16 text-center">Account</span>
+        </div>
+        <div className="flex items-center gap-1 mt-1">
+          <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 dark:text-gray-300"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" fill="currentColor"/></svg>
+          <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 text-gray-700 dark:text-gray-300"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.02-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.02 1.6 1.02 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z" fill="currentColor"/></svg>
+          <svg viewBox="0 0 13 13" className="w-4 h-4 sm:w-5 sm:h-5"><rect x="0" y="0" width="6" height="6" fill="#F25022"/><rect x="7" y="0" width="6" height="6" fill="#7FBA00"/><rect x="0" y="7" width="6" height="6" fill="#00A4EF"/><rect x="7" y="7" width="6" height="6" fill="#FFB900"/></svg>
+        </div>
+        <span className="text-xs font-bold tracking-[0.15em] text-gray-400 dark:text-gray-500 mt-0.5">{isEncrypt ? "ENCRYPT" : "DECRYPT"}</span>
       </div>
 
-      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
-        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
-        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
-
-      <div className="flex flex-col items-center gap-2 w-28">
-        <div className="w-16 h-16 rounded-2xl bg-green-500/10 dark:bg-green-400/10 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
-            <rect x="4" y="2" width="16" height="20" rx="3" />
-            <line x1="4" y1="12" x2="20" y2="12" strokeDasharray="2 2" />
-            <rect x="7" y="6" width="4" height="4" rx="0.5" />
-            <rect x="13" y="6" width="4" height="4" rx="0.5" />
-            <rect x="7" y="14" width="4" height="4" rx="0.5" />
-          </svg>
-        </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Scan</span>
+      <div className="flex h-[60px] sm:h-[76px] items-center">
+        <svg viewBox="0 0 24 14" className="w-6 sm:w-7 h-auto text-gray-300 dark:text-gray-600" fill="none">
+          <path d="M0 7h18m-6-6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
       </div>
 
-      <svg width="32" height="20" viewBox="0 0 32 20" className="text-gray-300 dark:text-gray-600 hidden sm:block flex-shrink-0">
-        <line x1="0" y1="10" x2="24" y2="10" stroke="currentColor" strokeWidth="2" />
-        <polyline points="20,4 28,10 20,16" fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
-
-      <div className="flex flex-col items-center gap-2 w-28">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/10 flex items-center justify-center">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
-            <rect x="2" y="6" width="20" height="14" rx="2" />
-            <path d="M2 10h20" />
-            <circle cx="17" cy="15" r="1.5" />
-            <path d="M6 6V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2" />
-          </svg>
+      <div className="flex flex-col items-center">
+        <div className="w-[60px] h-[60px] sm:w-[76px] sm:h-[76px] rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 flex items-center justify-center">
+          {isEncrypt ? (
+            <svg viewBox="0 0 48 48" className="w-10 h-10 sm:w-12 sm:h-12" fill="none" shapeRendering="geometricPrecision">
+              <rect x="0" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
+              <rect x="28" y="0" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
+              <rect x="0" y="28" width="20" height="20" rx="3" stroke="#34d399" strokeWidth="2.5" />
+              <rect x="6" y="6" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="34" y="6" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="6" y="34" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="29" y="29" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="40" y="29" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="29" y="40" width="8" height="8" rx="1.5" fill="#34d399" />
+              <rect x="40" y="40" width="8" height="8" rx="1.5" fill="#34d399" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 48 42" className="w-10 h-9 sm:w-12 sm:h-11" fill="none" shapeRendering="geometricPrecision">
+              <rect x="1" y="10" width="46" height="31" rx="4" stroke="#34d399" strokeWidth="2.5" />
+              <line x1="1" y1="18" x2="47" y2="18" stroke="#34d399" strokeWidth="2.5" />
+              <circle cx="38" cy="28" r="3" fill="#34d399" />
+              <path d="M7 10V5a3 3 0 0 1 3-3h28" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          )}
         </div>
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400">Wallet</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1.5">{isEncrypt ? "QR Code" : "Wallet"}</span>
+      </div>
+    </div>
+  );
+}
+
+function FlowDiagram() {
+  return (
+    <div className="w-full max-w-md mx-auto my-6 space-y-6">
+      <div className="space-y-3">
+        <FlowRow mode="encrypt" />
+        <a
+          href="/wallet-to-qr"
+          className="block text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg text-base transition-colors"
+        >
+          Create Encrypted QR
+        </a>
+      </div>
+      <div className="space-y-3">
+        <FlowRow mode="decrypt" />
+        <a
+          href="/qr-to-wallet"
+          className="block text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg text-base transition-colors"
+        >
+          Open Wallet from QR
+        </a>
       </div>
     </div>
   );
@@ -406,28 +555,17 @@ function LandingContent() {
     <div className="w-full max-w-3xl mx-auto px-4 sm:px-6">
       {/* Hero */}
       <section className="pt-6 sm:pt-10 pb-8 sm:pb-12 text-center">
-        <h1 className="text-xl sm:text-3xl font-bold mb-2 leading-tight whitespace-nowrap">
-          Your crypto wallet, <span className="text-m-blue-light-5 dark:text-m-blue-light-4">double-locked in a QR&nbsp;code</span>
+        <h1 className="text-[clamp(1rem,4.5vw,1.875rem)] font-bold mb-2 leading-tight break-words">
+          Your crypto wallet,{" "}
+          <span className="text-m-blue-light-5 dark:text-m-blue-light-4">
+            double-locked in a QR code
+          </span>
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-3">
           Encrypt your mnemonic with a password and bind it to your
           Google, Apple, GitHub, or Microsoft account &mdash; two layers of protection.
         </p>
-        <FlowInfographic />
-        <div className="flex flex-col sm:flex-row gap-3 justify-center mt-5">
-          <a
-            href="/wallet-to-qr"
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-sm"
-          >
-            Create Encrypted QR
-          </a>
-          <a
-            href="/qr-to-wallet"
-            className="bg-m-green hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg text-sm"
-          >
-            Open Wallet from QR
-          </a>
-        </div>
+        <FlowDiagram />
       </section>
 
       {/* Two layers — security-first */}

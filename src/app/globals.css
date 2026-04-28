@@ -28,5 +28,5 @@
 
 body {
   font-family: "Roboto", system-ui, -apple-system, sans-serif;
-  @apply bg-white text-gray-800 dark:bg-m-blue-dark-4 dark:text-gray-300;
+  @apply bg-white text-gray-800 dark:bg-m-blue-dark-4 dark:text-gray-300 overflow-x-hidden;
 }

@@ -8,10 +8,17 @@ import QrCanvas from "@/components/QrCanvas";
 import SignInButtons, { providerDisplayName } from "@/components/SignInButtons";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { validatePasswordStrength } from "@/lib/compat/crypto";
-import { buildQrUrl, buildQrUrlV2, decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
-import { extractPayloadFromQrData } from "@/lib/compat/qrDecoder";
-import { fetchPepper } from "@/lib/compat/fetchPepper";
+import { buildQrUrlV3 } from "@/lib/compat/qrPayload";
+import { encryptV3 } from "@/lib/compat/cryptoV3";
+import type { EncryptionMode } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
+
+const MODE_OPTIONS: { value: EncryptionMode; label: string; desc: string; badge?: string }[] = [
+  { value: "a", label: "Password only", desc: "Basic single-factor encryption" },
+  { value: "b", label: "Password + social account", desc: "Two-factor: password + Google/Apple/GitHub/Microsoft" },
+  { value: "c", label: "Password + backup code", desc: "Two-factor: password + recovery code" },
+  { value: "d", label: "Password + social + backup", desc: "Strongest — with recovery fallback", badge: "recommended" },
+];
 
 export default function WalletToQrPage() {
   const [mnemonic, setMnemonic] = useState("");
@@ -20,15 +27,17 @@ export default function WalletToQrPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [bindAccount, setBindAccount] = useState(true);
+  const [mode, setMode] = useState<EncryptionMode>("d");
   const [encrypting, setEncrypting] = useState(false);
+  const [backupCode, setBackupCode] = useState<string | null>(null);
+  const [backupSaved, setBackupSaved] = useState(false);
   const { setSession } = useSession();
   const router = useRouter();
   const { data: authSession, status: authStatus } = useAuthSession();
 
   const isSignedIn = authStatus === "authenticated";
-  const pepperRef = { current: "" };
-  const boundProviderRef = { current: "" };
+  const needsAccount = mode === "b" || mode === "d";
+  const hasBackup = mode === "c" || mode === "d";
 
   const handleEncrypt = useCallback(
     async (e: React.FormEvent) => {
@@ -41,7 +50,6 @@ export default function WalletToQrPage() {
         setError(pwError);
         return;
       }
-
       if (password !== confirmPassword) {
         setError("Passwords do not match");
         return;
@@ -54,52 +62,73 @@ export default function WalletToQrPage() {
         return;
       }
 
-      if (bindAccount) {
-        if (!isSignedIn) {
-          setError("Please sign in with a provider first");
-          return;
-        }
-        setEncrypting(true);
-        try {
-          const { provider, sub_hash, pepper } = await fetchPepper();
-          pepperRef.current = pepper;
-          boundProviderRef.current = provider;
-          const qrUrl = buildQrUrlV2(trimmed, password, pepper, provider, sub_hash);
-          setQrData(qrUrl);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to get account pepper");
-        } finally {
-          setEncrypting(false);
-        }
-      } else {
-        const qrUrl = buildQrUrl(trimmed, password);
+      if (needsAccount && !isSignedIn) {
+        setError("Please sign in with a provider first");
+        return;
+      }
+
+      setEncrypting(true);
+      try {
+        const providerStableId = authSession?.providerSub ?? authSession?.sub;
+        const provider = authSession?.provider;
+
+        const result = await encryptV3(trimmed, password, {
+          mode,
+          providerStableId: needsAccount ? (providerStableId ?? undefined) : undefined,
+          provider: needsAccount ? (provider ?? undefined) : undefined,
+        });
+
+        const qrUrl = buildQrUrlV3(result);
         setQrData(qrUrl);
+
+        if (hasBackup && result.backupCode) {
+          setBackupCode(result.backupCode);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Encryption failed");
+      } finally {
+        setEncrypting(false);
       }
     },
-    [mnemonic, password, confirmPassword, bindAccount, isSignedIn]
+    [mnemonic, password, confirmPassword, mode, needsAccount, hasBackup, isSignedIn, authSession]
   );
 
-  const handleTestDecode = useCallback(() => {
-    if (!qrData) return;
-    const payload = extractPayloadFromQrData(qrData);
+  const handleDownloadRecovery = useCallback(() => {
+    if (!backupCode) return;
+    const provider = authSession?.provider
+      ? providerDisplayName(authSession.provider)
+      : "";
+    const text = [
+      "Wallet2QR Recovery Information",
+      "==============================",
+      `Created: ${new Date().toISOString().slice(0, 10)}`,
+      "",
+      `Backup Recovery Code:`,
+      backupCode,
+      "",
+      `Encryption Mode: ${MODE_OPTIONS.find((o) => o.value === mode)?.label}`,
+      provider ? `Bound Provider: ${provider}` : "",
+      "",
+      "IMPORTANT:",
+      "- Keep this code in a safe place, separate from your QR code.",
+      "- You need this code + your password to recover your wallet if you lose access to your social account.",
+      "- Never share this code with anyone.",
+      "- wallet2qr.com cannot recover your wallet if you lose both your backup code and social account access.",
+      "",
+      "Social login is used only to verify your identity.",
+      "OAuth tokens are NOT used as encryption keys.",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-    let decrypted: string | null;
-    if (bindAccount && pepperRef.current) {
-      decrypted = decryptPayloadV2(payload, password, pepperRef.current);
-    } else {
-      decrypted = decryptPayload(payload, password);
-    }
-
-    if (decrypted) {
-      setTestResult(
-        decrypted === mnemonic.trim()
-          ? "Round-trip successful — decrypted mnemonic matches!"
-          : "WARNING: Decrypted text does not match original mnemonic."
-      );
-    } else {
-      setTestResult("ERROR: Decryption failed.");
-    }
-  }, [qrData, password, mnemonic, bindAccount]);
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "wallet2qr-recovery.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [backupCode, authSession, mode]);
 
   const handleReset = useCallback(() => {
     setMnemonic("");
@@ -108,12 +137,12 @@ export default function WalletToQrPage() {
     setQrData(null);
     setError(null);
     setTestResult(null);
-    setBindAccount(true);
-    pepperRef.current = "";
-    boundProviderRef.current = "";
+    setMode("d");
+    setBackupCode(null);
+    setBackupSaved(false);
   }, []);
 
-  const canSubmit = !encrypting && (!bindAccount || isSignedIn);
+  const canSubmit = !encrypting && (!needsAccount || isSignedIn);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
@@ -159,30 +188,57 @@ export default function WalletToQrPage() {
           />
         </div>
 
+        {/* Encryption mode selector */}
         {!qrData && (
-          <div className={`rounded-xl border transition-colors ${bindAccount ? "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/20" : "border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/20"} p-4 space-y-3`}>
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={bindAccount}
-                onChange={(e) => setBindAccount(e.target.checked)}
-                className="rounded border-gray-300 dark:border-gray-600 mt-0.5"
-              />
-              <div>
-                <span className="text-sm font-bold text-gray-700 dark:text-gray-200 block">
-                  Bind to my account (recommended)
-                </span>
-              </div>
-            </label>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+            <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+              Encryption Mode
+            </p>
+            <div className="space-y-2">
+              {MODE_OPTIONS.map((opt) => (
+                <label
+                  key={opt.value}
+                  className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-colors ${
+                    mode === opt.value
+                      ? "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/20"
+                      : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="enc-mode"
+                    value={opt.value}
+                    checked={mode === opt.value}
+                    onChange={() => setMode(opt.value)}
+                    className="mt-0.5 accent-blue-500"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                      {opt.label}
+                    </span>
+                    {opt.badge && (
+                      <span className="ml-2 text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded font-bold">
+                        {opt.badge}
+                      </span>
+                    )}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {opt.desc}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
 
-            {bindAccount ? (
-              <div className="ml-7 space-y-3">
-                <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                  Choose a provider to bind this QR to your account
-                </p>
-
+            {/* Social sign-in area */}
+            {needsAccount && (
+              <div className="ml-2 sm:ml-7 space-y-3 pt-2">
                 {!isSignedIn ? (
-                  <SignInButtons activeProviderId={null} />
+                  <>
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                      Sign in to bind this QR to your account
+                    </p>
+                    <SignInButtons activeProviderId={null} />
+                  </>
                 ) : (
                   <>
                     <SignInButtons activeProviderId={authSession?.provider} />
@@ -199,39 +255,77 @@ export default function WalletToQrPage() {
                     </div>
                   </>
                 )}
-
-                <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                  Two-layer protection: your QR code is encrypted with AES-256 using your password,
-                  and a unique key derived from your account acts as a second factor. Even if someone
-                  has the QR and your password, they cannot decrypt it without access to your account.
-                </p>
-              </div>
-            ) : (
-              <div className="ml-7">
-                <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5">
-                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                    <line x1="12" y1="9" x2="12" y2="13" />
-                    <line x1="12" y1="17" x2="12.01" y2="17" />
-                  </svg>
-                  <p className="text-xs leading-relaxed">
-                    Without account binding, anyone who obtains your QR code and password can access
-                    your wallet. Binding to an account adds a second factor that makes this significantly harder.
-                  </p>
-                </div>
               </div>
             )}
+
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed mt-2">
+              Social login is used only to verify your identity.
+              OAuth tokens are not used as encryption keys — only your account&apos;s
+              stable identifier (which never changes) is mixed into the key derivation.
+            </p>
           </div>
         )}
 
         {error && <p className="text-m-red text-sm">{error}</p>}
 
+        {/* QR output */}
         {qrData && (
           <>
             <div className="mt-4">
               <QrCanvas data={qrData} />
             </div>
 
+            {/* Backup code display */}
+            {backupCode && !backupSaved && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-400 dark:border-amber-600 rounded-xl p-4 space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                      Recovery Backup Code
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Save this code — it will not be shown again.
+                      If you lose access to your social account, you can use this code + your password to decrypt your wallet.
+                    </p>
+                    <div className="bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
+                      <code className="text-sm font-bold text-gray-800 dark:text-gray-200 select-all break-all">
+                        {backupCode}
+                      </code>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard.writeText(backupCode)}
+                        className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 border border-amber-300 dark:border-amber-700 rounded px-3 py-1.5"
+                      >
+                        Copy Code
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDownloadRecovery}
+                        className="text-xs font-bold text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 border border-amber-300 dark:border-amber-700 rounded px-3 py-1.5"
+                      >
+                        Download Recovery Info
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBackupSaved(true)}
+                      className="text-xs font-bold text-green-700 dark:text-green-400 hover:text-green-900 border border-green-300 dark:border-green-700 rounded px-3 py-1.5"
+                    >
+                      I&apos;ve saved my backup code
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Warning */}
             <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-xl p-4">
               <div className="flex items-start gap-2.5">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5">
@@ -242,10 +336,10 @@ export default function WalletToQrPage() {
                 <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed space-y-1">
                   <p className="font-bold">Save this QR code securely and remember your password.</p>
                   <p>
-                    Losing the QR code, forgetting your password
-                    {bindAccount ? ", or losing access to your " + providerDisplayName(boundProviderRef.current || authSession?.provider || "") + " account" : ""}
-                    {" "}will result in permanent loss of access to your funds. Never share these with anyone
-                    — a third party with your QR{bindAccount ? ", password, and account access" : " and password"} can take full control of your wallet.
+                    If you lose your password
+                    {hasBackup ? " and backup code" : ""}
+                    {needsAccount ? `, or lose access to your ${providerDisplayName(authSession?.provider ?? "")} account${hasBackup ? " (without your backup code)" : ""}` : ""}
+                    , Wallet2QR cannot restore your wallet.
                   </p>
                 </div>
               </div>
@@ -256,9 +350,7 @@ export default function WalletToQrPage() {
         {testResult && (
           <p
             className={`text-sm font-bold ${
-              testResult.startsWith("Round-trip")
-                ? "text-m-green"
-                : "text-m-red"
+              testResult.startsWith("Round-trip") ? "text-m-green" : "text-m-red"
             }`}
           >
             {testResult}
@@ -285,13 +377,6 @@ export default function WalletToQrPage() {
                 className="bg-m-green hover:bg-green-600 text-white font-bold py-1.5 px-4 rounded-md text-sm"
               >
                 Open Wallet
-              </button>
-              <button
-                type="button"
-                onClick={handleTestDecode}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm"
-              >
-                Test Decode
               </button>
               <button
                 type="button"
