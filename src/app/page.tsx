@@ -236,69 +236,44 @@ function TwoLayerSection() {
 }
 
 function FlowInfographic() {
+  const providerIcons = (
+    <div className="flex gap-0.5 sm:gap-1">
+      <svg width="10" height="10" viewBox="0 0 24 24" className="sm:w-3 sm:h-3"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500 dark:text-gray-400 sm:w-3 sm:h-3"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500 dark:text-gray-400 sm:w-3 sm:h-3"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.02-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.02 1.6 1.02 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
+      <svg width="10" height="10" viewBox="0 0 24 24" className="sm:w-3 sm:h-3"><rect x="2" y="2" width="9.5" height="9.5" fill="#F25022"/><rect x="12.5" y="2" width="9.5" height="9.5" fill="#7FBA00"/><rect x="2" y="12.5" width="9.5" height="9.5" fill="#00A4EF"/><rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#FFB900"/></svg>
+    </div>
+  );
+
   return (
-    <div className="py-3 max-w-2xl mx-auto space-y-3">
-      {/* Row 1: Encrypt */}
-      <div className="rounded-2xl bg-gradient-to-r from-blue-50 via-white to-green-50 dark:from-blue-950/30 dark:via-m-blue-dark-3 dark:to-green-950/30 border border-gray-200 dark:border-gray-700/50 p-3 sm:p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2 sm:gap-0">
-          {/* Mnemonic */}
-          <div className="flex flex-col items-center gap-1 min-w-[52px] sm:min-w-[72px]">
-            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/25 flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-7 sm:h-7">
+    <div className="py-3 max-w-xl mx-auto">
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-700/50 bg-gradient-to-b from-blue-50/80 via-white to-emerald-50/80 dark:from-blue-950/30 dark:via-m-blue-dark-3 dark:to-emerald-950/30 shadow-sm overflow-hidden">
+
+        {/* Top row: Mnemonic → QR (Encrypt) */}
+        <div className="flex items-center justify-between px-5 sm:px-8 pt-4 pb-2 sm:pt-5 sm:pb-3">
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-blue-500 shadow-lg shadow-blue-500/25 flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-7 sm:h-7">
                 <rect x="3" y="4" width="18" height="16" rx="2" />
                 <line x1="7" y1="9" x2="17" y2="9" />
                 <line x1="7" y1="13" x2="14" y2="13" />
               </svg>
             </div>
-            <span className="text-[9px] sm:text-[11px] font-bold text-gray-600 dark:text-gray-300">Mnemonic</span>
+            <span className="text-[10px] sm:text-xs font-bold text-gray-600 dark:text-gray-300">Mnemonic</span>
           </div>
 
-          {/* Arrow */}
-          <svg width="20" height="12" viewBox="0 0 20 12" className="text-blue-300 dark:text-blue-700 flex-shrink-0">
-            <line x1="0" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="2" />
-            <polyline points="10,2 18,6 10,10" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-
-          {/* Two-layer lock */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
-            <div className="flex flex-col items-center gap-0.5">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-500/15 dark:bg-blue-400/15 border-2 border-blue-300 dark:border-blue-700 flex items-center justify-center shadow-sm">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400 sm:w-6 sm:h-6">
-                  <rect x="5" y="11" width="14" height="10" rx="2" />
-                  <path d="M8 11V7a4 4 0 1 1 8 0v4" />
-                </svg>
-              </div>
-              <span className="text-[8px] sm:text-[10px] font-bold text-blue-600 dark:text-blue-400">Password</span>
-            </div>
-
-            <div className="text-gray-300 dark:text-gray-600 text-lg font-light select-none">+</div>
-
-            <div className="flex flex-col items-center gap-0.5">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/15 dark:bg-purple-400/15 border-2 border-purple-300 dark:border-purple-700 flex items-center justify-center shadow-sm">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-600 dark:text-purple-400 sm:w-6 sm:h-6">
-                  <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
-                </svg>
-              </div>
-              <span className="text-[8px] sm:text-[10px] font-bold text-purple-600 dark:text-purple-400">Account</span>
-              <div className="flex gap-0.5">
-                <svg width="8" height="8" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500 dark:text-gray-400"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500 dark:text-gray-400"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.02-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.02 1.6 1.02 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
-                <svg width="8" height="8" viewBox="0 0 24 24"><rect x="2" y="2" width="9.5" height="9.5" fill="#F25022"/><rect x="12.5" y="2" width="9.5" height="9.5" fill="#7FBA00"/><rect x="2" y="12.5" width="9.5" height="9.5" fill="#00A4EF"/><rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#FFB900"/></svg>
-              </div>
-            </div>
+          <div className="flex-1 flex items-center justify-center px-2">
+            <svg width="100%" height="20" viewBox="0 0 100 20" preserveAspectRatio="none" className="max-w-[140px] sm:max-w-[200px]">
+              <defs><linearGradient id="enc"><stop offset="0%" stopColor="#3b82f6" /><stop offset="100%" stopColor="#22c55e" /></linearGradient></defs>
+              <line x1="0" y1="10" x2="85" y2="10" stroke="url(#enc)" strokeWidth="2" />
+              <polyline points="80,4 95,10 80,16" fill="none" stroke="#22c55e" strokeWidth="2" />
+              <text x="42" y="7" textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="bold">ENCRYPT</text>
+            </svg>
           </div>
 
-          {/* Arrow */}
-          <svg width="20" height="12" viewBox="0 0 20 12" className="text-green-300 dark:text-green-700 flex-shrink-0">
-            <line x1="0" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="2" />
-            <polyline points="10,2 18,6 10,10" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-
-          {/* QR Code */}
-          <div className="flex flex-col items-center gap-1 min-w-[52px] sm:min-w-[72px]">
-            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-green-500 shadow-lg shadow-green-500/25 flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="white" className="sm:w-7 sm:h-7">
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-green-500 shadow-lg shadow-green-500/25 flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white" className="sm:w-7 sm:h-7">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="3" width="7" height="7" rx="1" />
                 <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -311,83 +286,86 @@ function FlowInfographic() {
                 <rect x="5" y="16" width="3" height="3" rx="0.5" fill="#22c55e" />
               </svg>
             </div>
-            <span className="text-[9px] sm:text-[11px] font-bold text-gray-600 dark:text-gray-300">QR Code</span>
+            <span className="text-[10px] sm:text-xs font-bold text-gray-600 dark:text-gray-300">QR Code</span>
           </div>
         </div>
-        <div className="text-[9px] sm:text-[10px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest">Encrypt &amp; Store</div>
-      </div>
 
-      {/* Row 2: Decrypt */}
-      <div className="rounded-2xl bg-gradient-to-r from-green-50 via-white to-emerald-50 dark:from-green-950/30 dark:via-m-blue-dark-3 dark:to-emerald-950/30 border border-gray-200 dark:border-gray-700/50 p-3 sm:p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2 sm:gap-0">
-          {/* Scan QR */}
-          <div className="flex flex-col items-center gap-1 min-w-[52px] sm:min-w-[72px]">
-            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-green-500 shadow-lg shadow-green-500/25 flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-7 sm:h-7">
+        {/* Center bar: Two-layer protection */}
+        <div className="mx-3 sm:mx-5 my-1 rounded-xl bg-white/80 dark:bg-m-blue-dark-2/80 border border-gray-200 dark:border-gray-700 shadow-sm px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center justify-center gap-3 sm:gap-5">
+            {/* Arrows pointing down from top + up from bottom */}
+            <div className="hidden sm:flex flex-col items-center gap-1 text-blue-300 dark:text-blue-700">
+              <svg width="12" height="16" viewBox="0 0 12 16"><polyline points="2,0 6,5 10,0" fill="none" stroke="currentColor" strokeWidth="2" /><line x1="6" y1="5" x2="6" y2="16" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2" /></svg>
+              <svg width="12" height="16" viewBox="0 0 12 16"><line x1="6" y1="0" x2="6" y2="11" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2" /><polyline points="2,16 6,11 10,16" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            </div>
+
+            {/* Password */}
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-blue-500/15 dark:bg-blue-400/15 border-2 border-blue-400 dark:border-blue-600 flex items-center justify-center shadow-sm">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400 sm:w-7 sm:h-7">
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 1 1 8 0v4" />
+                </svg>
+              </div>
+              <span className="text-[10px] sm:text-xs font-bold text-blue-600 dark:text-blue-400">Password</span>
+            </div>
+
+            <div className="text-gray-300 dark:text-gray-600 text-2xl font-light select-none">+</div>
+
+            {/* Account */}
+            <div className="flex flex-col items-center gap-1">
+              <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-purple-500/15 dark:bg-purple-400/15 border-2 border-purple-400 dark:border-purple-600 flex items-center justify-center shadow-sm">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-600 dark:text-purple-400 sm:w-7 sm:h-7">
+                  <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+                </svg>
+              </div>
+              <span className="text-[10px] sm:text-xs font-bold text-purple-600 dark:text-purple-400">Account</span>
+              {providerIcons}
+            </div>
+
+            {/* Arrows */}
+            <div className="hidden sm:flex flex-col items-center gap-1 text-green-300 dark:text-green-700">
+              <svg width="12" height="16" viewBox="0 0 12 16"><polyline points="2,0 6,5 10,0" fill="none" stroke="currentColor" strokeWidth="2" /><line x1="6" y1="5" x2="6" y2="16" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2" /></svg>
+              <svg width="12" height="16" viewBox="0 0 12 16"><line x1="6" y1="0" x2="6" y2="11" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2" /><polyline points="2,16 6,11 10,16" fill="none" stroke="currentColor" strokeWidth="2" /></svg>
+            </div>
+          </div>
+          <p className="text-[9px] sm:text-[10px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest">Both required to encrypt &amp; decrypt</p>
+        </div>
+
+        {/* Bottom row: QR → Wallet (Decrypt) */}
+        <div className="flex items-center justify-between px-5 sm:px-8 pt-2 pb-4 sm:pt-3 sm:pb-5">
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-green-500 shadow-lg shadow-green-500/25 flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-7 sm:h-7">
                 <rect x="4" y="2" width="16" height="20" rx="3" />
                 <rect x="7" y="6" width="4" height="4" rx="0.5" fill="white" fillOpacity="0.5" />
                 <rect x="13" y="6" width="4" height="4" rx="0.5" fill="white" fillOpacity="0.5" />
                 <rect x="7" y="12" width="4" height="4" rx="0.5" fill="white" fillOpacity="0.5" />
               </svg>
             </div>
-            <span className="text-[9px] sm:text-[11px] font-bold text-gray-600 dark:text-gray-300">Scan QR</span>
+            <span className="text-[10px] sm:text-xs font-bold text-gray-600 dark:text-gray-300">Scan QR</span>
           </div>
 
-          {/* Arrow */}
-          <svg width="20" height="12" viewBox="0 0 20 12" className="text-green-300 dark:text-green-700 flex-shrink-0">
-            <line x1="0" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="2" />
-            <polyline points="10,2 18,6 10,10" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-
-          {/* Two-layer lock */}
-          <div className="flex items-center gap-1.5 sm:gap-2.5">
-            <div className="flex flex-col items-center gap-0.5">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-blue-500/15 dark:bg-blue-400/15 border-2 border-blue-300 dark:border-blue-700 flex items-center justify-center shadow-sm">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-blue-600 dark:text-blue-400 sm:w-6 sm:h-6">
-                  <rect x="5" y="11" width="14" height="10" rx="2" />
-                  <path d="M8 11V7a4 4 0 1 1 8 0v4" />
-                </svg>
-              </div>
-              <span className="text-[8px] sm:text-[10px] font-bold text-blue-600 dark:text-blue-400">Password</span>
-            </div>
-
-            <div className="text-gray-300 dark:text-gray-600 text-lg font-light select-none">+</div>
-
-            <div className="flex flex-col items-center gap-0.5">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-purple-500/15 dark:bg-purple-400/15 border-2 border-purple-300 dark:border-purple-700 flex items-center justify-center shadow-sm">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-600 dark:text-purple-400 sm:w-6 sm:h-6">
-                  <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
-                </svg>
-              </div>
-              <span className="text-[8px] sm:text-[10px] font-bold text-purple-600 dark:text-purple-400">Account</span>
-              <div className="flex gap-0.5">
-                <svg width="8" height="8" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500 dark:text-gray-400"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" className="text-gray-500 dark:text-gray-400"><path d="M12 2C6.477 2 2 6.477 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.02-2.69-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02.8-.22 1.65-.33 2.5-.33.85 0 1.7.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.02 1.6 1.02 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2z"/></svg>
-                <svg width="8" height="8" viewBox="0 0 24 24"><rect x="2" y="2" width="9.5" height="9.5" fill="#F25022"/><rect x="12.5" y="2" width="9.5" height="9.5" fill="#7FBA00"/><rect x="2" y="12.5" width="9.5" height="9.5" fill="#00A4EF"/><rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#FFB900"/></svg>
-              </div>
-            </div>
+          <div className="flex-1 flex items-center justify-center px-2">
+            <svg width="100%" height="20" viewBox="0 0 100 20" preserveAspectRatio="none" className="max-w-[140px] sm:max-w-[200px]">
+              <defs><linearGradient id="dec"><stop offset="0%" stopColor="#22c55e" /><stop offset="100%" stopColor="#10b981" /></linearGradient></defs>
+              <line x1="0" y1="10" x2="85" y2="10" stroke="url(#dec)" strokeWidth="2" />
+              <polyline points="80,4 95,10 80,16" fill="none" stroke="#10b981" strokeWidth="2" />
+              <text x="42" y="7" textAnchor="middle" fill="#9ca3af" fontSize="7" fontWeight="bold">DECRYPT</text>
+            </svg>
           </div>
 
-          {/* Arrow */}
-          <svg width="20" height="12" viewBox="0 0 20 12" className="text-emerald-300 dark:text-emerald-700 flex-shrink-0">
-            <line x1="0" y1="6" x2="12" y2="6" stroke="currentColor" strokeWidth="2" />
-            <polyline points="10,2 18,6 10,10" fill="none" stroke="currentColor" strokeWidth="2" />
-          </svg>
-
-          {/* Wallet */}
-          <div className="flex flex-col items-center gap-1 min-w-[52px] sm:min-w-[72px]">
-            <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-emerald-500 shadow-lg shadow-emerald-500/25 flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-7 sm:h-7">
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-emerald-500 shadow-lg shadow-emerald-500/25 flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="sm:w-7 sm:h-7">
                 <rect x="2" y="6" width="20" height="14" rx="2" />
                 <path d="M2 10h20" />
                 <circle cx="17" cy="15" r="1.5" />
               </svg>
             </div>
-            <span className="text-[9px] sm:text-[11px] font-bold text-gray-600 dark:text-gray-300">Wallet</span>
+            <span className="text-[10px] sm:text-xs font-bold text-gray-600 dark:text-gray-300">Wallet</span>
           </div>
         </div>
-        <div className="text-[9px] sm:text-[10px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest">Scan &amp; Unlock</div>
       </div>
     </div>
   );
