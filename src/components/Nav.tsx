@@ -195,7 +195,7 @@ export default function Nav() {
               onClick={() => setOpen(false)}
               className="block pt-2 border-t border-white/10 mt-2 text-[10px] text-gray-400 hover:text-white"
             >
-              Sign in with Google, Apple, GitHub, or Microsoft
+              Sign in with Google, GitHub, or Microsoft
             </Link>
           )}
         </nav>

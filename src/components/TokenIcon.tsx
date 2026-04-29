@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { getTokenIconUrl } from "@/lib/wallet/tokenIcons";
+import { getCachedIcon } from "@/lib/wallet/prices";
 import type { AssetCategory } from "@/lib/wallet/assets";
 
 const AVATAR_COLORS: Record<AssetCategory, string> = {
@@ -29,7 +30,8 @@ export default function TokenIcon({
   className = "",
 }: TokenIconProps) {
   const [failed, setFailed] = useState(false);
-  const url = getTokenIconUrl(networkKey, symbol, tokenAddress);
+  const cachedIcon = getCachedIcon(networkKey, tokenAddress);
+  const url = cachedIcon || getTokenIconUrl(networkKey, symbol, tokenAddress);
 
   if (failed || !url) {
     return (

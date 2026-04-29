@@ -15,7 +15,7 @@ import { useSession } from "@/lib/state/session";
 
 const MODE_OPTIONS: { value: EncryptionMode; label: string; desc: string; badge?: string }[] = [
   { value: "a", label: "Password only", desc: "Basic single-factor encryption" },
-  { value: "b", label: "Password + social account", desc: "Two-factor: password + Google/Apple/GitHub/Microsoft", badge: "recommended" },
+  { value: "b", label: "Password + social account", desc: "Two-factor: password + Google/GitHub/Microsoft", badge: "recommended" },
 ];
 
 export default function WalletToQrPage() {
@@ -25,7 +25,7 @@ export default function WalletToQrPage() {
   const [qrData, setQrData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const [mode, setMode] = useState<EncryptionMode>("b");
+  const [mode, setMode] = useState<EncryptionMode>("a");
   const [encrypting, setEncrypting] = useState(false);
   const { setSession } = useSession();
   const router = useRouter();
@@ -91,7 +91,7 @@ export default function WalletToQrPage() {
     setQrData(null);
     setError(null);
     setTestResult(null);
-    setMode("b");
+    setMode("a");
   }, []);
 
   const canSubmit = !encrypting && (!needsAccount || isSignedIn);
@@ -198,7 +198,7 @@ export default function WalletToQrPage() {
                     recommended
                   </span>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Two-factor: password + Google/Apple/GitHub/Microsoft
+                    Two-factor: password + Google/GitHub/Microsoft
                   </p>
                 </div>
               </label>

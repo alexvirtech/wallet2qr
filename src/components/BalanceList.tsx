@@ -21,6 +21,15 @@ import { getAssetsForNetwork, type AssetCategory } from "@/lib/wallet/assets";
 import TokenIcon from "@/components/TokenIcon";
 import type { Address } from "viem";
 
+const FETCH_TIMEOUT = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
+
 export interface BalanceItem {
   symbol: string;
   name: string;
@@ -224,7 +233,7 @@ async function refreshDirect(
 
   const [priceResult, ...balanceResults] = await Promise.allSettled([
     fetchPrices(),
-    ...tasks.map((t) => t.fetch()),
+    ...tasks.map((t) => withTimeout(t.fetch(), FETCH_TIMEOUT)),
   ]);
 
   const prices = priceResult.status === "fulfilled" ? priceResult.value : {};

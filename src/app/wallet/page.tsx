@@ -6,6 +6,7 @@ import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveAccount } from "@/lib/wallet/derive";
 import { getNetwork } from "@/lib/wallet/networks";
+import { prefetchIcons } from "@/lib/wallet/prices";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import BalanceList from "@/components/BalanceList";
 import QRCode from "qrcode";
@@ -46,6 +47,8 @@ export default function WalletPage() {
     setHideZero(val);
     try { localStorage.setItem("w2q_hideZero", String(val)); } catch {}
   }, []);
+
+  useEffect(() => { prefetchIcons(); }, []);
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");

@@ -3,6 +3,8 @@ import { rateLimitedFetch } from "./rateLimiter";
 
 const CACHE_TTL = 60_000;
 const LS_KEY = "w2q_prices";
+const LS_ICONS_KEY = "w2q_icons";
+const ICON_CLIENT_TTL = 24 * 60 * 60 * 1000;
 
 interface PriceCache {
   prices: Record<string, number>;
@@ -136,4 +138,46 @@ export async function fetchPrices(): Promise<Record<string, number>> {
   } catch {
     return cache?.prices ?? { ...defaultPrices };
   }
+}
+
+let iconStore: Record<string, string> = {};
+let iconsFetched = false;
+
+function loadCachedIcons(): boolean {
+  try {
+    const raw = localStorage.getItem(LS_ICONS_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > ICON_CLIENT_TTL) return false;
+    iconStore = parsed.icons;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveCachedIcons(icons: Record<string, string>) {
+  try {
+    localStorage.setItem(LS_ICONS_KEY, JSON.stringify({ icons, timestamp: Date.now() }));
+  } catch {}
+}
+
+export function getCachedIcon(networkKey: string, tokenAddress: string): string | null {
+  return iconStore[`${networkKey}:${tokenAddress}`] || null;
+}
+
+export async function prefetchIcons(): Promise<void> {
+  if (iconsFetched) return;
+  if (typeof window !== "undefined" && loadCachedIcons()) {
+    iconsFetched = true;
+    return;
+  }
+  try {
+    const res = await fetch("/api/icons");
+    if (!res.ok) return;
+    const icons: Record<string, string> = await res.json();
+    iconStore = icons;
+    iconsFetched = true;
+    if (typeof window !== "undefined") saveCachedIcons(icons);
+  } catch {}
 }
