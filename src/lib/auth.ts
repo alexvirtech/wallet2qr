@@ -48,6 +48,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   pages: {
-    error: "/admin/auth-error",
+    error: "/auth-error",
   },
 });
