@@ -35,7 +35,7 @@ export default function QrToWalletPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
-  const [mode, setMode] = useState<Mode>("wallet");
+  const [mode, setMode] = useState<Mode>("mnemonic");
   const [readOnly, setReadOnly] = useState(false);
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
@@ -71,12 +71,7 @@ export default function QrToWalletPage() {
   const v3NeedsAccount = v3env && v3env.m === "b";
   const usesSocialFactor = selectedProvider && isSignedIn && sessionProvider === selectedProvider;
 
-  useEffect(() => {
-    if (!envelope || !isSignedIn || selectedProvider) return;
-    if (isV3 && v3NeedsAccount && v3env?.p && sessionProvider === v3env.p) {
-      setSelectedProvider(v3env.p);
-    }
-  }, [envelope, isSignedIn, selectedProvider, isV3, v3NeedsAccount, v3env, sessionProvider]);
+  const needsAccount = v3NeedsAccount || isV2;
 
   const accountMismatch = useMemo(() => {
     if (!usesSocialFactor || !providerSub) return false;
@@ -250,7 +245,7 @@ export default function QrToWalletPage() {
     setPassword("");
     setError(null);
     setRevealedMnemonic(null);
-    setMode("wallet");
+    setMode("mnemonic");
     setReadOnly(false);
     setSelectedProvider(null);
   }, []);
@@ -328,46 +323,48 @@ export default function QrToWalletPage() {
             />
           </div>
 
-          {/* Social account selector (always shown) */}
-          <div className="space-y-2">
-            <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
-              Social account
-              {v3NeedsAccount && (
-                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
-                  required — encrypted with {providerDisplayName(v3env?.p ?? "")}
-                </span>
-              )}
-              {!v3NeedsAccount && (
-                <span className="text-xs font-normal text-gray-400 ml-2">
-                  select only if QR was encrypted with a social account
-                </span>
-              )}
-            </p>
-
-            <ProviderSelector
-              selectedId={selectedProvider}
-              onToggle={handleProviderToggle}
-              sessionProviderId={sessionProvider ?? undefined}
-              hintProviderId={hintProvider}
-            />
-
-            {selectedProvider && isSignedIn && sessionProvider === selectedProvider && !accountMismatch && (
-              <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span className="text-xs text-green-700 dark:text-green-300">
-                  Signed in as <strong>{authSession?.user?.email}</strong>
-                </span>
-              </div>
-            )}
-
-            {accountMismatch && (
-              <p className="text-xs text-red-600 dark:text-red-400 font-bold">
-                This QR was bound to a different account. Sign out and use the original account.
+          {/* Social account selector (only for account-bound QRs) */}
+          {needsAccount && (
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+                Social account
+                {v3NeedsAccount && (
+                  <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
+                    required — encrypted with {providerDisplayName(v3env?.p ?? "")}
+                  </span>
+                )}
+                {isV2 && (
+                  <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
+                    required — account-bound (legacy)
+                  </span>
+                )}
               </p>
-            )}
-          </div>
+
+              <ProviderSelector
+                selectedId={selectedProvider}
+                onToggle={handleProviderToggle}
+                sessionProviderId={sessionProvider ?? undefined}
+                hintProviderId={hintProvider}
+              />
+
+              {selectedProvider && isSignedIn && sessionProvider === selectedProvider && !accountMismatch && (
+                <div className="flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span className="text-xs text-green-700 dark:text-green-300">
+                    Signed in as <strong>{authSession?.user?.email}</strong>
+                  </span>
+                </div>
+              )}
+
+              {accountMismatch && (
+                <p className="text-xs text-red-600 dark:text-red-400 font-bold">
+                  This QR was bound to a different account. Sign out and use the original account.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Mode selection */}
           <div className="space-y-2">
@@ -379,36 +376,34 @@ export default function QrToWalletPage() {
                 <input
                   type="radio"
                   name="mode"
-                  checked={mode === "wallet"}
-                  onChange={() => setMode("wallet")}
-                  className="accent-blue-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">Open Wallet</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="mode"
                   checked={mode === "mnemonic"}
                   onChange={() => setMode("mnemonic")}
                   className="accent-blue-500"
                 />
                 <span className="text-sm text-gray-700 dark:text-gray-300">View Mnemonic</span>
               </label>
-            </div>
-
-            {mode === "wallet" && (
-              <label className="flex items-center gap-2 cursor-pointer ml-6">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
-                  type="checkbox"
-                  checked={readOnly}
-                  onChange={(e) => setReadOnly(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
+                  type="radio"
+                  name="mode"
+                  checked={mode === "wallet"}
+                  onChange={() => setMode("wallet")}
+                  className="accent-blue-500"
                 />
-                <span className="text-sm text-gray-600 dark:text-gray-300">Read-only mode</span>
-                <span className="text-xs text-gray-400">(view balances only, no transactions)</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Open Wallet</span>
               </label>
-            )}
+              {mode === "wallet" && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={readOnly}
+                    onChange={(e) => setReadOnly(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Read-only</span>
+                </label>
+              )}
+            </div>
           </div>
 
           {error && <p className="text-m-red text-sm">{error}</p>}
