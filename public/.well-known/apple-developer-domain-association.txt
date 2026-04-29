@@ -1,0 +1,2 @@
+com.wallet2qr.auth
+com.wallet2qr.web
