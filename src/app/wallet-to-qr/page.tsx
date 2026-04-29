@@ -142,79 +142,101 @@ export default function WalletToQrPage() {
 
         {/* Encryption mode selector */}
         {!qrData && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+          <div className="space-y-2">
             <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
               Encryption Mode
             </p>
-            <div className="space-y-2">
-              {MODE_OPTIONS.map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-colors ${
-                    mode === opt.value
-                      ? "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/20"
-                      : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="enc-mode"
-                    value={opt.value}
-                    checked={mode === opt.value}
-                    onChange={() => setMode(opt.value)}
-                    className="mt-0.5 accent-blue-500"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                      {opt.label}
-                    </span>
-                    {opt.badge && (
-                      <span className="ml-2 text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded font-bold">
-                        {opt.badge}
-                      </span>
-                    )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {opt.desc}
-                    </p>
-                  </div>
-                </label>
-              ))}
-            </div>
 
-            {/* Social sign-in area */}
-            {needsAccount && (
-              <div className="ml-2 sm:ml-7 space-y-3 pt-2">
-                {!isSignedIn ? (
-                  <>
-                    <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                      Sign in to bind this QR to your account
-                    </p>
-                    <SignInButtons activeProviderId={null} />
-                  </>
-                ) : (
-                  <>
-                    <SignInButtons activeProviderId={authSession?.provider} />
-                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      <span className="text-xs text-green-700 dark:text-green-300">
-                        Signed in as <strong>{authSession?.user?.email}</strong>
-                        {authSession?.provider && (
-                          <span className="text-green-600 dark:text-green-400"> via {providerDisplayName(authSession.provider)}</span>
-                        )}
-                      </span>
-                    </div>
-                  </>
-                )}
+            {/* Mode A: Password only */}
+            <label
+              className={`flex items-start gap-3 cursor-pointer rounded-lg border p-3 transition-colors ${
+                mode === "a"
+                  ? "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/20"
+                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <input
+                type="radio"
+                name="enc-mode"
+                value="a"
+                checked={mode === "a"}
+                onChange={() => setMode("a")}
+                className="mt-0.5 accent-blue-500"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                  Password only
+                </span>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Basic single-factor encryption
+                </p>
               </div>
-            )}
+            </label>
 
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed mt-2">
-              Social login is used only to verify your identity.
-              OAuth tokens are not used as encryption keys — only your account&apos;s
-              stable identifier (which never changes) is mixed into the key derivation.
-            </p>
+            {/* Mode B: Password + social account */}
+            <div
+              className={`rounded-lg border p-3 transition-colors ${
+                mode === "b"
+                  ? "border-blue-300 dark:border-blue-700 bg-blue-50/30 dark:bg-blue-950/20"
+                  : "border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="enc-mode"
+                  value="b"
+                  checked={mode === "b"}
+                  onChange={() => setMode("b")}
+                  className="mt-0.5 accent-blue-500"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                    Password + social account
+                  </span>
+                  <span className="ml-2 text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded font-bold">
+                    recommended
+                  </span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Two-factor: password + Google/Apple/GitHub/Microsoft
+                  </p>
+                </div>
+              </label>
+
+              {needsAccount && (
+                <div className="mt-3 ml-6 space-y-3">
+                  {!isSignedIn ? (
+                    <>
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                        Sign in to bind this QR to your account
+                      </p>
+                      <SignInButtons activeProviderId={null} />
+                    </>
+                  ) : (
+                    <>
+                      <SignInButtons activeProviderId={authSession?.provider} />
+                      <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span className="text-xs text-green-700 dark:text-green-300">
+                          Signed in as <strong>{authSession?.user?.email}</strong>
+                          {authSession?.provider && (
+                            <span className="text-green-600 dark:text-green-400"> via {providerDisplayName(authSession.provider)}</span>
+                          )}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed">
+                    Social login is used only to verify your identity.
+                    OAuth tokens are not used as encryption keys — only your account&apos;s
+                    stable identifier (which never changes) is mixed into the key derivation.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
