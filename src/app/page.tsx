@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { useSession as useAuthSession } from "next-auth/react";
-import SignInButtons from "@/components/SignInButtons";
+import { signIn, useSession as useAuthSession } from "next-auth/react";
+import ProviderSelector from "@/components/ProviderSelector";
 import { providerDisplayName } from "@/components/SignInButtons";
 import { decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
@@ -43,12 +43,25 @@ function DeepLinkHandler() {
   const [decrypting, setDecrypting] = useState(false);
   const [autoAttempted, setAutoAttempted] = useState(false);
   const [readOnly, setReadOnly] = useState(roParam === "1");
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
+  const sessionProvider = authSession?.provider ?? null;
   const v3NeedsAccount = isV3 && (encMode === "b" || encMode === "d") && !useBackup;
   const v3NeedsBackup = isV3 && (encMode === "c" || (encMode === "d" && useBackup));
-  const v3AccountMismatch = v3NeedsAccount && isSignedIn && providerSub && ph
+  const usesSocialFactor = selectedProvider && isSignedIn && sessionProvider === selectedProvider;
+  const v3AccountMismatch = v3NeedsAccount && usesSocialFactor && providerSub && ph
     ? computeProviderIdHash(providerSub) !== ph
     : false;
+
+  const handleProviderToggle = useCallback((id: string) => {
+    if (selectedProvider === id) {
+      setSelectedProvider(null);
+    } else if (isSignedIn && sessionProvider === id) {
+      setSelectedProvider(id);
+    } else {
+      signIn(id, { callbackUrl: typeof window !== "undefined" ? window.location.href : "/" });
+    }
+  }, [selectedProvider, isSignedIn, sessionProvider]);
 
   const handleDecrypt = useCallback(async (pwd?: string) => {
     const pass = pwd ?? password;
@@ -59,8 +72,12 @@ function DeepLinkHandler() {
 
     // v3 decrypt
     if (isV3 && salt && encMode) {
-      if (v3NeedsAccount && !isSignedIn) {
-        setError("Please sign in first.");
+      if (v3NeedsAccount && !usesSocialFactor) {
+        if (!selectedProvider) {
+          setError(`This QR requires a social account (${providerDisplayName(provider ?? "")}). Select the provider.`);
+        } else {
+          setError(`Please sign in with ${providerDisplayName(selectedProvider)} first`);
+        }
         return;
       }
       if (v3NeedsBackup && !backupCode.trim()) {
@@ -74,7 +91,7 @@ function DeepLinkHandler() {
       try {
         const decrypted = await decryptV3(ds, pass, salt, {
           mode: encMode,
-          providerStableId: v3NeedsAccount && providerSub ? providerSub : undefined,
+          providerStableId: v3NeedsAccount && usesSocialFactor && providerSub ? providerSub : undefined,
           backupCode: v3NeedsBackup ? backupCode.trim() : undefined,
           wrappedKey1B64: w1 ?? undefined,
           wrappedKey2B64: w2 ?? undefined,
@@ -105,8 +122,12 @@ function DeepLinkHandler() {
     }
 
     // v2 decrypt
-    if (isV2 && !isSignedIn) {
-      setError("Please sign in first.");
+    if (isV2 && !usesSocialFactor) {
+      if (!selectedProvider) {
+        setError("This QR requires a social account. Select the provider you used during encryption.");
+      } else {
+        setError(`Please sign in with ${providerDisplayName(selectedProvider)} first`);
+      }
       return;
     }
     setDecrypting(true);
@@ -116,7 +137,7 @@ function DeepLinkHandler() {
       let mnemonic: string;
       let isDet = false;
 
-      if (isV2 && isSignedIn) {
+      if (isV2 && usesSocialFactor) {
         const { pepper } = await fetchPepper();
         const decrypted = decryptPayloadV2(ds, pass, pepper);
         if (decrypted) {
@@ -154,7 +175,7 @@ function DeepLinkHandler() {
       setError(err instanceof Error ? err.message : "Decryption failed");
       setDecrypting(false);
     }
-  }, [ds, password, readOnly, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, w1, w2, setSession, router]);
+  }, [ds, password, readOnly, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, usesSocialFactor, selectedProvider, provider, w1, w2, setSession, router]);
 
   useEffect(() => {
     if (ds && pw && !autoAttempted && !isV2 && !isV3) {
@@ -165,9 +186,7 @@ function DeepLinkHandler() {
 
   if (!ds) return null;
 
-  const canDecrypt = !decrypting &&
-    (!isV2 || isSignedIn) &&
-    (!v3NeedsAccount || (isSignedIn && !v3AccountMismatch));
+  const canDecrypt = !decrypting;
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-12">
@@ -178,65 +197,31 @@ function DeepLinkHandler() {
           decrypt and open it.
         </p>
 
-        {/* v3 account-bound notice */}
-        {isV3 && (encMode === "b" || encMode === "d") && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
-            <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-              This wallet is bound to a {providerDisplayName(provider ?? "")} account.
+        {/* Social account selector */}
+        {(isV3 || isV2) && (
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+              Social account
+              {(v3NeedsAccount || isV2) && (
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
+                  required — encrypted with {providerDisplayName(isV2 ? (pep ?? "google") : (provider ?? ""))}
+                </span>
+              )}
             </p>
-            {encMode === "d" && (
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setUseBackup(false)}
-                  className={`text-xs font-bold py-1 px-3 rounded border ${!useBackup ? "border-blue-400 bg-blue-100 dark:bg-blue-900/40 text-blue-700" : "border-gray-300 text-gray-500"}`}
-                >
-                  Sign in
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setUseBackup(true)}
-                  className={`text-xs font-bold py-1 px-3 rounded border ${useBackup ? "border-amber-400 bg-amber-100 dark:bg-amber-900/40 text-amber-700" : "border-gray-300 text-gray-500"}`}
-                >
-                  Use backup code
-                </button>
-              </div>
-            )}
-            {!useBackup && !isSignedIn && (
-              <div className="space-y-2">
-                <p className="text-xs text-blue-600 dark:text-blue-400">Sign in with the original account to decrypt.</p>
-                <SignInButtons callbackUrl={typeof window !== "undefined" ? window.location.href : "/"} compact />
-              </div>
-            )}
-            {!useBackup && isSignedIn && !v3AccountMismatch && (
+            <ProviderSelector
+              selectedId={selectedProvider}
+              onToggle={handleProviderToggle}
+              sessionProviderId={sessionProvider ?? undefined}
+              hintProviderId={isV3 ? (provider ?? undefined) : undefined}
+            />
+            {usesSocialFactor && !v3AccountMismatch && (
               <div className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
                 <span className="text-xs text-green-700 dark:text-green-300">Signed in as <strong>{authSession?.user?.email}</strong></span>
               </div>
             )}
-            {!useBackup && v3AccountMismatch && (
-              <p className="text-sm text-red-600 font-bold">This QR was bound to a different account.</p>
-            )}
-          </div>
-        )}
-
-        {/* v2 (legacy) notice */}
-        {isV2 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 space-y-2">
-            <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-              This wallet is bound to a {providerDisplayName(pep ?? "google")} account.
-            </p>
-            {!isSignedIn && (
-              <div className="space-y-2">
-                <p className="text-xs text-blue-600 dark:text-blue-400">Sign in with the original account to decrypt.</p>
-                <SignInButtons callbackUrl={typeof window !== "undefined" ? window.location.href : "/"} compact />
-              </div>
-            )}
-            {isSignedIn && (
-              <div className="flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                <span className="text-xs text-green-700 dark:text-green-300">Signed in as <strong>{authSession?.user?.email}</strong></span>
-              </div>
+            {v3AccountMismatch && (
+              <p className="text-xs text-red-600 dark:text-red-400 font-bold">This QR was bound to a different account.</p>
             )}
           </div>
         )}

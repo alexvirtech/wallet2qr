@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession as useAuthSession } from "next-auth/react";
+import { signIn, useSession as useAuthSession } from "next-auth/react";
 import MnemonicInput from "@/components/MnemonicInput";
 import QrCanvas from "@/components/QrCanvas";
-import SignInButtons, { providerDisplayName } from "@/components/SignInButtons";
+import ProviderSelector from "@/components/ProviderSelector";
+import { providerDisplayName } from "@/components/SignInButtons";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { validatePasswordStrength } from "@/lib/compat/crypto";
 import { buildQrUrlV3 } from "@/lib/compat/qrPayload";
@@ -13,10 +14,7 @@ import { encryptV3 } from "@/lib/compat/cryptoV3";
 import type { EncryptionMode } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
 
-const MODE_OPTIONS: { value: EncryptionMode; label: string; desc: string; badge?: string }[] = [
-  { value: "a", label: "Password only", desc: "Basic single-factor encryption" },
-  { value: "b", label: "Password + social account", desc: "Two-factor: password + Google/GitHub/Microsoft", badge: "recommended" },
-];
+const SS_PROVIDER_KEY = "w2q_encrypt_provider";
 
 export default function WalletToQrPage() {
   const [mnemonic, setMnemonic] = useState("");
@@ -26,13 +24,41 @@ export default function WalletToQrPage() {
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
   const [mode, setMode] = useState<EncryptionMode>("a");
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [encrypting, setEncrypting] = useState(false);
   const { setSession } = useSession();
   const router = useRouter();
   const { data: authSession, status: authStatus } = useAuthSession();
 
   const isSignedIn = authStatus === "authenticated";
-  const needsAccount = mode === "b";
+  const sessionProvider = authSession?.provider ?? null;
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(SS_PROVIDER_KEY);
+    if (saved) {
+      sessionStorage.removeItem(SS_PROVIDER_KEY);
+      if (isSignedIn && sessionProvider === saved) {
+        setSelectedProvider(saved);
+        setMode("b");
+      }
+    }
+  }, [isSignedIn, sessionProvider]);
+
+  const handleProviderToggle = useCallback(
+    (id: string) => {
+      if (selectedProvider === id) {
+        setSelectedProvider(null);
+        return;
+      }
+      if (isSignedIn && sessionProvider === id) {
+        setSelectedProvider(id);
+      } else {
+        sessionStorage.setItem(SS_PROVIDER_KEY, id);
+        signIn(id, { callbackUrl: "/wallet-to-qr" });
+      }
+    },
+    [selectedProvider, isSignedIn, sessionProvider]
+  );
 
   const handleEncrypt = useCallback(
     async (e: React.FormEvent) => {
@@ -57,20 +83,25 @@ export default function WalletToQrPage() {
         return;
       }
 
-      if (needsAccount && !isSignedIn) {
-        setError("Please sign in with a provider first");
-        return;
+      if (mode === "b") {
+        if (!selectedProvider) {
+          setError("Select a social account for two-factor encryption");
+          return;
+        }
+        if (!isSignedIn || sessionProvider !== selectedProvider) {
+          setError(`Please sign in with ${providerDisplayName(selectedProvider)} first`);
+          return;
+        }
       }
 
       setEncrypting(true);
       try {
         const providerStableId = authSession?.providerSub ?? authSession?.sub;
-        const provider = authSession?.provider;
 
         const result = await encryptV3(trimmed, password, {
           mode,
-          providerStableId: needsAccount ? (providerStableId ?? undefined) : undefined,
-          provider: needsAccount ? (provider ?? undefined) : undefined,
+          providerStableId: mode === "b" ? (providerStableId ?? undefined) : undefined,
+          provider: mode === "b" ? (sessionProvider ?? undefined) : undefined,
         });
 
         const qrUrl = buildQrUrlV3(result);
@@ -81,7 +112,7 @@ export default function WalletToQrPage() {
         setEncrypting(false);
       }
     },
-    [mnemonic, password, confirmPassword, mode, needsAccount, isSignedIn, authSession]
+    [mnemonic, password, confirmPassword, mode, selectedProvider, isSignedIn, sessionProvider, authSession]
   );
 
   const handleReset = useCallback(() => {
@@ -92,9 +123,8 @@ export default function WalletToQrPage() {
     setError(null);
     setTestResult(null);
     setMode("a");
+    setSelectedProvider(null);
   }, []);
-
-  const canSubmit = !encrypting && (!needsAccount || isSignedIn);
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
@@ -160,7 +190,7 @@ export default function WalletToQrPage() {
                 name="enc-mode"
                 value="a"
                 checked={mode === "a"}
-                onChange={() => setMode("a")}
+                onChange={() => { setMode("a"); setSelectedProvider(null); }}
                 className="mt-0.5 accent-blue-500"
               />
               <div className="flex-1">
@@ -203,36 +233,34 @@ export default function WalletToQrPage() {
                 </div>
               </label>
 
-              {needsAccount && (
+              {mode === "b" && (
                 <div className="mt-3 ml-6 space-y-3">
-                  {!isSignedIn ? (
-                    <>
-                      <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                        Sign in to bind this QR to your account
-                      </p>
-                      <SignInButtons activeProviderId={null} />
-                    </>
-                  ) : (
-                    <>
-                      <SignInButtons activeProviderId={authSession?.provider} />
-                      <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        <span className="text-xs text-green-700 dark:text-green-300">
-                          Signed in as <strong>{authSession?.user?.email}</strong>
-                          {authSession?.provider && (
-                            <span className="text-green-600 dark:text-green-400"> via {providerDisplayName(authSession.provider)}</span>
-                          )}
-                        </span>
-                      </div>
-                    </>
+                  <p className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                    Select account to bind this QR
+                  </p>
+
+                  <ProviderSelector
+                    selectedId={selectedProvider}
+                    onToggle={handleProviderToggle}
+                    sessionProviderId={sessionProvider ?? undefined}
+                  />
+
+                  {selectedProvider && isSignedIn && sessionProvider === selectedProvider && (
+                    <div className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg py-2 px-3">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span className="text-xs text-green-700 dark:text-green-300">
+                        Signed in as <strong>{authSession?.user?.email}</strong>
+                        {" "}via {providerDisplayName(sessionProvider)}
+                      </span>
+                    </div>
                   )}
 
                   <p className="text-[11px] text-gray-400 dark:text-gray-500 leading-relaxed">
-                    Social login is used only to verify your identity.
-                    OAuth tokens are not used as encryption keys — only your account&apos;s
-                    stable identifier (which never changes) is mixed into the key derivation.
+                    Social login is used only to obtain a stable account identifier.
+                    OAuth tokens and client secrets are not used for encryption.
+                    To decrypt later, you must use the same password and the same social account.
                   </p>
                 </div>
               )}
@@ -261,7 +289,7 @@ export default function WalletToQrPage() {
                   <p className="font-bold">Save this QR code securely and remember your password.</p>
                   <p>
                     If you lose your password
-                    {needsAccount ? `, or lose access to your ${providerDisplayName(authSession?.provider ?? "")} account` : ""}
+                    {selectedProvider ? `, or lose access to your ${providerDisplayName(selectedProvider)} account` : ""}
                     , Wallet2QR cannot restore your wallet.
                   </p>
                 </div>
@@ -284,7 +312,7 @@ export default function WalletToQrPage() {
           {!qrData ? (
             <button
               type="submit"
-              disabled={!canSubmit}
+              disabled={encrypting}
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-6 rounded-md disabled:opacity-50"
             >
               {encrypting ? "Encrypting..." : "Encrypt"}

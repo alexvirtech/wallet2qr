@@ -2,9 +2,10 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession as useAuthSession } from "next-auth/react";
+import { signIn, useSession as useAuthSession } from "next-auth/react";
 import QrScanner from "@/components/QrScanner";
-import SignInButtons, { providerDisplayName } from "@/components/SignInButtons";
+import ProviderSelector from "@/components/ProviderSelector";
+import { providerDisplayName } from "@/components/SignInButtons";
 import { decryptPayload, decryptPayloadV2, parseEnvelope } from "@/lib/compat/qrPayload";
 import type { Envelope, V3Envelope } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
@@ -13,6 +14,9 @@ import { fetchPepper } from "@/lib/compat/fetchPepper";
 import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
 import { sha256 } from "@noble/hashes/sha256";
+
+const SS_QR_KEY = "w2q_pending_qr";
+const SS_PROVIDER_KEY = "w2q_decrypt_provider";
 
 function computeSubHash(sub: string): string {
   const hash = sha256(new TextEncoder().encode(sub));
@@ -29,53 +33,79 @@ export default function QrToWalletPage() {
   const [rawQrUrl, setRawQrUrl] = useState<string | null>(null);
   const [envelope, setEnvelope] = useState<Envelope | null>(null);
   const [password, setPassword] = useState("");
-  const [backupCode, setBackupCode] = useState("");
-  const [useBackup, setUseBackup] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
   const [mode, setMode] = useState<Mode>("wallet");
   const [readOnly, setReadOnly] = useState(false);
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const { setSession } = useSession();
   const router = useRouter();
   const { data: authSession, status: authStatus } = useAuthSession();
 
   const isSignedIn = authStatus === "authenticated";
+  const sessionProvider = authSession?.provider ?? null;
+  const providerSub = authSession?.providerSub ?? authSession?.sub;
 
   useEffect(() => {
-    const saved = sessionStorage.getItem("w2q_pending_qr");
-    if (saved) {
-      sessionStorage.removeItem("w2q_pending_qr");
-      setRawQrUrl(saved);
-      setEnvelope(parseEnvelope(saved));
+    const savedQr = sessionStorage.getItem(SS_QR_KEY);
+    if (savedQr) {
+      sessionStorage.removeItem(SS_QR_KEY);
+      setRawQrUrl(savedQr);
+      setEnvelope(parseEnvelope(savedQr));
     }
-  }, []);
+    const savedProvider = sessionStorage.getItem(SS_PROVIDER_KEY);
+    if (savedProvider) {
+      sessionStorage.removeItem(SS_PROVIDER_KEY);
+      if (isSignedIn && sessionProvider === savedProvider) {
+        setSelectedProvider(savedProvider);
+      }
+    }
+  }, [isSignedIn, sessionProvider]);
 
   const isV2 = envelope?.v === 2;
   const isV3 = envelope?.v === 3;
   const v3env = isV3 ? (envelope as V3Envelope) : null;
-  const v3NeedsAccount = v3env && (v3env.m === "b" || v3env.m === "d") && !useBackup;
-  const v3NeedsBackup = v3env && (v3env.m === "c" || (v3env.m === "d" && useBackup));
 
-  const providerSub = authSession?.providerSub ?? authSession?.sub;
+  const v3NeedsAccount = v3env && v3env.m === "b";
+  const usesSocialFactor = selectedProvider && isSignedIn && sessionProvider === selectedProvider;
 
   const accountMismatch = useMemo(() => {
-    if (isV2 && isSignedIn && providerSub) {
+    if (!usesSocialFactor || !providerSub) return false;
+    if (isV2) {
       const env = envelope as { v: 2; sh: string };
       return computeSubHash(providerSub) !== env.sh;
     }
-    if (isV3 && v3NeedsAccount && isSignedIn && providerSub && v3env?.ph) {
+    if (isV3 && v3NeedsAccount && v3env?.ph) {
       return computeProviderIdHash(providerSub) !== v3env.ph;
     }
     return false;
-  }, [isV2, isV3, isSignedIn, providerSub, envelope, v3env, v3NeedsAccount]);
+  }, [isV2, isV3, usesSocialFactor, providerSub, envelope, v3env, v3NeedsAccount]);
 
   const handleDecoded = useCallback((rawUrl: string) => {
     setRawQrUrl(rawUrl);
     const env = parseEnvelope(rawUrl);
     setEnvelope(env);
     setError(null);
+    setSelectedProvider(null);
   }, []);
+
+  const handleProviderToggle = useCallback(
+    (id: string) => {
+      if (selectedProvider === id) {
+        setSelectedProvider(null);
+        return;
+      }
+      if (isSignedIn && sessionProvider === id) {
+        setSelectedProvider(id);
+      } else {
+        if (rawQrUrl) sessionStorage.setItem(SS_QR_KEY, rawQrUrl);
+        sessionStorage.setItem(SS_PROVIDER_KEY, id);
+        signIn(id, { callbackUrl: "/qr-to-wallet" });
+      }
+    },
+    [selectedProvider, isSignedIn, sessionProvider, rawQrUrl]
+  );
 
   const handleDecrypt = useCallback(async () => {
     if (!envelope || !password) {
@@ -85,17 +115,19 @@ export default function QrToWalletPage() {
 
     // v3 decrypt
     if (isV3 && v3env) {
-      if (v3NeedsAccount && !isSignedIn) {
-        setError("Please sign in first.");
-        return;
-      }
-      if (v3NeedsAccount && accountMismatch) {
-        setError("This QR was bound to a different account.");
-        return;
-      }
-      if (v3NeedsBackup && !backupCode.trim()) {
-        setError("Enter your backup recovery code.");
-        return;
+      if (v3NeedsAccount) {
+        if (!selectedProvider) {
+          setError(`This QR requires a social account (${providerDisplayName(v3env.p ?? "")}). Select the provider you used during encryption.`);
+          return;
+        }
+        if (!isSignedIn || sessionProvider !== selectedProvider) {
+          setError(`Please sign in with ${providerDisplayName(selectedProvider)} first`);
+          return;
+        }
+        if (accountMismatch) {
+          setError("This QR was bound to a different account. Sign out and use the original account.");
+          return;
+        }
       }
 
       setDecrypting(true);
@@ -108,17 +140,12 @@ export default function QrToWalletPage() {
           v3env.s,
           {
             mode: v3env.m,
-            providerStableId: v3NeedsAccount && providerSub ? providerSub : undefined,
-            backupCode: v3NeedsBackup ? backupCode.trim() : undefined,
-            wrappedKey1B64: v3env.w1,
-            wrappedKey2B64: v3env.w2,
+            providerStableId: v3NeedsAccount && usesSocialFactor && providerSub ? providerSub : undefined,
           }
         );
 
         if (!decrypted) {
-          setError("Decryption failed — wrong password" +
-            (v3NeedsAccount ? ", wrong account" : "") +
-            (v3NeedsBackup ? ", or wrong backup code" : "") + ".");
+          setError("Decryption failed — wrong password" + (v3NeedsAccount ? " or wrong account" : "") + ".");
           setDecrypting(false);
           return;
         }
@@ -147,8 +174,8 @@ export default function QrToWalletPage() {
 
     // v2 decrypt
     if (isV2) {
-      if (!isSignedIn) {
-        setError("Please sign in first.");
+      if (!usesSocialFactor) {
+        setError("This QR requires a social account. Select and sign in with the original provider.");
         return;
       }
       if (accountMismatch) {
@@ -164,7 +191,7 @@ export default function QrToWalletPage() {
       let mnemonic: string;
       let isDet = false;
 
-      if (isV2 && isSignedIn) {
+      if (isV2 && usesSocialFactor) {
         const { pepper } = await fetchPepper();
         const decrypted = decryptPayloadV2(envelope.ds, password, pepper);
         if (decrypted) {
@@ -207,30 +234,25 @@ export default function QrToWalletPage() {
       setError(err instanceof Error ? err.message : "Decryption failed");
       setDecrypting(false);
     }
-  }, [envelope, password, mode, readOnly, setSession, router, isV2, isV3, v3env, isSignedIn, accountMismatch, v3NeedsAccount, v3NeedsBackup, providerSub, backupCode]);
+  }, [envelope, password, mode, readOnly, setSession, router, isV2, isV3, v3env, isSignedIn, sessionProvider, selectedProvider, usesSocialFactor, accountMismatch, v3NeedsAccount, providerSub]);
 
   const handleReset = useCallback(() => {
     setRawQrUrl(null);
     setEnvelope(null);
     setPassword("");
-    setBackupCode("");
-    setUseBackup(false);
     setError(null);
     setRevealedMnemonic(null);
     setMode("wallet");
     setReadOnly(false);
+    setSelectedProvider(null);
   }, []);
-
-  const canDecrypt = !decrypting &&
-    (!isV2 || (isSignedIn && !accountMismatch)) &&
-    (!isV3 || !v3NeedsAccount || (isSignedIn && !accountMismatch));
 
   const v3ModeLabel = v3env
     ? v3env.m === "a" ? "Password only"
-      : v3env.m === "b" ? "Password + social account"
-      : v3env.m === "c" ? "Password + backup code"
-      : "Password + social + backup"
+      : "Password + social account"
     : "";
+
+  const hintProvider = v3env?.p ?? undefined;
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
@@ -282,106 +304,6 @@ export default function QrToWalletPage() {
             )}
           </div>
 
-          {/* v3 account-bound notice */}
-          {isV3 && (v3env?.m === "b" || v3env?.m === "d") && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                This QR is bound to a {providerDisplayName(v3env?.p ?? "")} account.
-              </p>
-
-              {v3env?.m === "d" && (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setUseBackup(false)}
-                    className={`text-xs font-bold py-1 px-3 rounded border transition-colors ${
-                      !useBackup
-                        ? "border-blue-400 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
-                        : "border-gray-300 dark:border-gray-600 text-gray-500"
-                    }`}
-                  >
-                    Sign in with account
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUseBackup(true)}
-                    className={`text-xs font-bold py-1 px-3 rounded border transition-colors ${
-                      useBackup
-                        ? "border-amber-400 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
-                        : "border-gray-300 dark:border-gray-600 text-gray-500"
-                    }`}
-                  >
-                    Use backup code
-                  </button>
-                </div>
-              )}
-
-              {!useBackup && !isSignedIn && (
-                <div className="space-y-2">
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
-                    Sign in with the original account to decrypt.
-                  </p>
-                  <SignInButtons
-                    callbackUrl="/qr-to-wallet"
-                    onBeforeSignIn={() => { if (rawQrUrl) sessionStorage.setItem("w2q_pending_qr", rawQrUrl); }}
-                    compact
-                  />
-                </div>
-              )}
-              {!useBackup && isSignedIn && accountMismatch && (
-                <p className="text-sm text-red-600 dark:text-red-400 font-bold">
-                  This QR was bound to a different account. Sign out and use the original account.
-                </p>
-              )}
-              {!useBackup && isSignedIn && !accountMismatch && (
-                <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  <span className="text-xs text-green-700 dark:text-green-300">
-                    Signed in as <strong>{authSession?.user?.email}</strong> — account matches.
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* v2 (legacy) account-bound notice */}
-          {isV2 && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-xl p-4 space-y-3">
-              <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
-                This QR is bound to a {providerDisplayName((envelope as { pep: string }).pep)} account.
-              </p>
-              {!isSignedIn && (
-                <div className="space-y-2">
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
-                    Sign in with the original account to decrypt.
-                  </p>
-                  <SignInButtons
-                    callbackUrl="/qr-to-wallet"
-                    onBeforeSignIn={() => { if (rawQrUrl) sessionStorage.setItem("w2q_pending_qr", rawQrUrl); }}
-                    compact
-                  />
-                </div>
-              )}
-              {isSignedIn && accountMismatch && (
-                <p className="text-sm text-red-600 dark:text-red-400 font-bold">
-                  This QR was bound to a different account. Sign out and use the original account.
-                </p>
-              )}
-              {isSignedIn && !accountMismatch && (
-                <div className="flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  <span className="text-xs text-green-700 dark:text-green-300">
-                    Signed in as <strong>{authSession?.user?.email}</strong> — account matches.
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Password input */}
           <div>
             <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
@@ -393,26 +315,51 @@ export default function QrToWalletPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password to decrypt"
               className="mt-1 px-2 py-1 border border-gray-300 rounded w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-              onKeyDown={(e) => e.key === "Enter" && canDecrypt && handleDecrypt()}
+              onKeyDown={(e) => e.key === "Enter" && !decrypting && handleDecrypt()}
               autoFocus
             />
           </div>
 
-          {/* Backup code input */}
-          {v3NeedsBackup && (
-            <div>
-              <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
-                Backup Recovery Code
-              </label>
-              <input
-                type="text"
-                value={backupCode}
-                onChange={(e) => setBackupCode(e.target.value.toUpperCase())}
-                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
-                className="mt-1 px-2 py-1 border border-gray-300 rounded w-full font-mono text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-              />
-            </div>
-          )}
+          {/* Social account selector (always shown) */}
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+              Social account
+              {v3NeedsAccount && (
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
+                  required — encrypted with {providerDisplayName(v3env?.p ?? "")}
+                </span>
+              )}
+              {!v3NeedsAccount && (
+                <span className="text-xs font-normal text-gray-400 ml-2">
+                  select only if QR was encrypted with a social account
+                </span>
+              )}
+            </p>
+
+            <ProviderSelector
+              selectedId={selectedProvider}
+              onToggle={handleProviderToggle}
+              sessionProviderId={sessionProvider ?? undefined}
+              hintProviderId={hintProvider}
+            />
+
+            {selectedProvider && isSignedIn && sessionProvider === selectedProvider && !accountMismatch && (
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span className="text-xs text-green-700 dark:text-green-300">
+                  Signed in as <strong>{authSession?.user?.email}</strong>
+                </span>
+              </div>
+            )}
+
+            {accountMismatch && (
+              <p className="text-xs text-red-600 dark:text-red-400 font-bold">
+                This QR was bound to a different account. Sign out and use the original account.
+              </p>
+            )}
+          </div>
 
           {/* Mode selection */}
           <div className="space-y-2">
@@ -461,7 +408,7 @@ export default function QrToWalletPage() {
           <div className="flex gap-2">
             <button
               onClick={handleDecrypt}
-              disabled={!canDecrypt}
+              disabled={decrypting}
               className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
             >
               {decrypting ? "Decrypting..." : "Decrypt"}
