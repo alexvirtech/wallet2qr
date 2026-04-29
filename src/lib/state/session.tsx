@@ -18,13 +18,14 @@ interface StoredSession {
   mnemonic: string;
   password: string;
   readOnly?: boolean;
+  isDeterministic?: boolean;
 }
 
-function saveToStorage(mnemonic: string, password: string, readOnly: boolean) {
+function saveToStorage(mnemonic: string, password: string, readOnly: boolean, isDeterministic: boolean) {
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ mnemonic, password, readOnly } satisfies StoredSession)
+      JSON.stringify({ mnemonic, password, readOnly, isDeterministic } satisfies StoredSession)
     );
   } catch {}
 }
@@ -49,7 +50,8 @@ interface SessionState {
   mnemonic: string | null;
   password: string | null;
   readOnly: boolean;
-  setSession: (mnemonic: string, password: string, readOnly?: boolean) => void;
+  isDeterministic: boolean;
+  setSession: (mnemonic: string, password: string, readOnly?: boolean, isDeterministic?: boolean) => void;
   lock: () => void;
   isUnlocked: boolean;
   verifyPassword: (input: string) => boolean;
@@ -59,6 +61,7 @@ const SessionContext = createContext<SessionState>({
   mnemonic: null,
   password: null,
   readOnly: false,
+  isDeterministic: false,
   setSession: () => {},
   lock: () => {},
   isUnlocked: false,
@@ -69,6 +72,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [mnemonic, setMnemonicRaw] = useState<string | null>(null);
   const [password, setPasswordRaw] = useState<string | null>(null);
   const [readOnly, setReadOnlyRaw] = useState(false);
+  const [isDeterministic, setIsDeterministicRaw] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,6 +83,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setMnemonicRaw(stored.mnemonic);
       setPasswordRaw(stored.password);
       setReadOnlyRaw(stored.readOnly ?? false);
+      setIsDeterministicRaw(stored.isDeterministic ?? false);
     }
     setHydrated(true);
   }, []);
@@ -87,6 +92,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMnemonicRaw(null);
     setPasswordRaw(null);
     setReadOnlyRaw(false);
+    setIsDeterministicRaw(false);
     clearStorage();
     router.push("/qr-to-wallet");
   }, [router]);
@@ -99,11 +105,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [mnemonic, lock]);
 
   const setSession = useCallback(
-    (m: string, p: string, ro = false) => {
+    (m: string, p: string, ro = false, det = false) => {
       setMnemonicRaw(m);
       setPasswordRaw(p);
       setReadOnlyRaw(ro);
-      saveToStorage(m, p, ro);
+      setIsDeterministicRaw(det);
+      saveToStorage(m, p, ro, det);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
     },
@@ -136,6 +143,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         mnemonic,
         password,
         readOnly,
+        isDeterministic,
         setSession,
         lock,
         isUnlocked: !!mnemonic,

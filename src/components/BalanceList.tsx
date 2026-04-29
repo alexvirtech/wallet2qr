@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { type NetworkConfig, allNetworks } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
@@ -45,6 +45,7 @@ interface BalanceListProps {
   accounts: NetworkAccount[];
   hideZero: boolean;
   onTotalChange?: (total: number) => void;
+  isDeterministic?: boolean;
 }
 
 const BORDER_COLORS: Record<AssetCategory, string> = {
@@ -254,21 +255,46 @@ async function refreshDirect(
   return items;
 }
 
-export default function BalanceList({ accounts, hideZero, onTotalChange }: BalanceListProps) {
+export default function BalanceList({ accounts, hideZero, onTotalChange, isDeterministic }: BalanceListProps) {
+  const { getVisibleTokens, getDerivationPath } = useSettings();
+  const { readOnly } = useSession();
+
+  const zeroBalances = useMemo(() => {
+    if (!isDeterministic) return null;
+    const items: BalanceItem[] = [];
+    for (const { network, networkKey } of accounts) {
+      const nativeDef = getAssetsForNetwork(network.key).find((a) => a.symbol === network.nativeCurrency.symbol);
+      items.push({
+        symbol: network.nativeCurrency.symbol,
+        name: network.nativeCurrency.name,
+        balance: "0",
+        rawBalance: 0,
+        usdValue: "$0.00",
+        usdNum: 0,
+        category: nativeDef?.category ?? "gas",
+        address: "",
+        tokenType: "native",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+    return items;
+  }, [isDeterministic, accounts]);
+
   const [balances, setBalances] = useState<BalanceItem[]>(() => {
+    if (zeroBalances) return zeroBalances;
     if (typeof window === "undefined") return [];
     const cached = loadCachedBalances();
     return cached[cacheKeyFor(accounts)] ?? [];
   });
   const [loading, setLoading] = useState(() => {
+    if (isDeterministic) return false;
     if (typeof window === "undefined") return true;
     const cached = loadCachedBalances();
     return !cached[cacheKeyFor(accounts)];
   });
   const [error, setError] = useState<string | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<BalanceItem | null>(null);
-  const { getVisibleTokens, getDerivationPath } = useSettings();
-  const { readOnly } = useSession();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const accountsRef = useRef(cacheKeyFor(accounts));
   const lastRefreshRef = useRef(0);
@@ -279,6 +305,7 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
   );
 
   const refresh = useCallback(async (silent = false) => {
+    if (isDeterministic) return;
     const now = Date.now();
     if (!silent && now - lastRefreshRef.current < 10_000) return;
     lastRefreshRef.current = now;
@@ -307,9 +334,14 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
     } finally {
       setLoading(false);
     }
-  }, [accounts, getVisibleTokens]);
+  }, [accounts, getVisibleTokens, isDeterministic]);
 
   useEffect(() => {
+    if (isDeterministic) {
+      if (zeroBalances) setBalances(zeroBalances);
+      setLoading(false);
+      return;
+    }
     const key = cacheKeyFor(accounts);
     if (accountsRef.current !== key) {
       accountsRef.current = key;
@@ -324,14 +356,15 @@ export default function BalanceList({ accounts, hideZero, onTotalChange }: Balan
       }
     }
     refresh(balances.length > 0);
-  }, [refresh]);
+  }, [refresh, isDeterministic, zeroBalances]);
 
   useEffect(() => {
+    if (isDeterministic) return;
     intervalRef.current = setInterval(() => refresh(true), REFRESH_INTERVAL);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [refresh]);
+  }, [refresh, isDeterministic]);
 
   const filtered = hideZero ? balances.filter((b) => b.rawBalance > 0) : balances;
   const totalUsd = balances.reduce((sum, b) => sum + (isNaN(b.usdNum) ? 0 : b.usdNum), 0);

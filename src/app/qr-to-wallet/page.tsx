@@ -162,6 +162,7 @@ export default function QrToWalletPage() {
 
     try {
       let mnemonic: string;
+      let isDet = false;
 
       if (isV2 && isSignedIn) {
         const { pepper } = await fetchPepper();
@@ -185,16 +186,18 @@ export default function QrToWalletPage() {
           const validation = validateBip39Mnemonic(decrypted);
           if (!validation.valid) {
             mnemonic = deterministicMnemonic(password, envelope.ds);
+            isDet = true;
           } else {
             mnemonic = decrypted;
           }
         } else {
           mnemonic = deterministicMnemonic(password, envelope.ds);
+          isDet = true;
         }
       }
 
       if (mode === "wallet") {
-        setSession(mnemonic, password, readOnly);
+        setSession(mnemonic, password, readOnly, isDet);
         router.push("/wallet");
       } else {
         setRevealedMnemonic(mnemonic);

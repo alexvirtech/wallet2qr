@@ -57,6 +57,12 @@ const defaultPrices: Record<string, number> = {
   DOGE: 0, ZEC: 0,
 };
 
+async function fetchFromServer(): Promise<Record<string, number>> {
+  const res = await fetch("/api/prices");
+  if (!res.ok) throw new Error(`Server prices ${res.status}`);
+  return res.json();
+}
+
 async function fetchFromCoinGecko(): Promise<Record<string, number>> {
   const ids = COINGECKO_IDS.join(",");
   const res = await rateLimitedFetch(
@@ -110,10 +116,18 @@ export async function fetchPrices(): Promise<Record<string, number>> {
       try {
         prices = await fetchProxyPrices();
       } catch {
-        prices = await fetchFromCoinGecko();
+        try {
+          prices = await fetchFromServer();
+        } catch {
+          prices = await fetchFromCoinGecko();
+        }
       }
     } else {
-      prices = await fetchFromCoinGecko();
+      try {
+        prices = await fetchFromServer();
+      } catch {
+        prices = await fetchFromCoinGecko();
+      }
     }
 
     cache = { prices, timestamp: Date.now() };

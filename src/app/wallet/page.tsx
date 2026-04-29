@@ -11,12 +11,13 @@ import BalanceList from "@/components/BalanceList";
 import QRCode from "qrcode";
 
 export default function WalletPage() {
-  const { mnemonic, isUnlocked } = useSession();
+  const { mnemonic, isUnlocked, isDeterministic } = useSession();
   const { settings, getActiveNetworkKeys, getDerivationPath } = useSettings();
   const router = useRouter();
 
   const activeKeys = getActiveNetworkKeys();
   const [networkKey, setNetworkKey] = useState(() => {
+    if (isDeterministic) return "ethereum";
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("w2q_network");
       if (stored && (stored === "all" || activeKeys.includes(stored))) return stored;
@@ -178,6 +179,7 @@ export default function WalletPage() {
         accounts={balanceAccounts}
         hideZero={hideZero}
         onTotalChange={setTotalUsd}
+        isDeterministic={isDeterministic}
       />
 
       <p className="text-xs text-gray-400 mt-4 text-center">

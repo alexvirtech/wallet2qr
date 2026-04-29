@@ -114,6 +114,7 @@ function DeepLinkHandler() {
 
     try {
       let mnemonic: string;
+      let isDet = false;
 
       if (isV2 && isSignedIn) {
         const { pepper } = await fetchPepper();
@@ -135,13 +136,19 @@ function DeepLinkHandler() {
         const decrypted = decryptPayload(ds, pass);
         if (decrypted) {
           const validation = validateBip39Mnemonic(decrypted);
-          mnemonic = validation.valid ? decrypted : deterministicMnemonic(pass, ds);
+          if (validation.valid) {
+            mnemonic = decrypted;
+          } else {
+            mnemonic = deterministicMnemonic(pass, ds);
+            isDet = true;
+          }
         } else {
           mnemonic = deterministicMnemonic(pass, ds);
+          isDet = true;
         }
       }
 
-      setSession(mnemonic, pass, readOnly);
+      setSession(mnemonic, pass, readOnly, isDet);
       router.push("/wallet");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Decryption failed");
@@ -458,18 +465,18 @@ function FlowDiagram() {
         <FlowRow mode="encrypt" />
         <a
           href="/wallet-to-qr"
-          className="block text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg text-base transition-colors"
+          className="block w-48 mx-auto text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-lg text-sm transition-colors"
         >
-          Create Encrypted QR
+          Encrypt to QR
         </a>
       </div>
       <div className="space-y-3">
         <FlowRow mode="decrypt" />
         <a
           href="/qr-to-wallet"
-          className="block text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg text-base transition-colors"
+          className="block w-48 mx-auto text-center bg-blue-500 hover:bg-blue-600 text-white font-bold py-2.5 rounded-lg text-sm transition-colors"
         >
-          Open Wallet from QR
+          Decrypt from QR
         </a>
       </div>
     </div>
