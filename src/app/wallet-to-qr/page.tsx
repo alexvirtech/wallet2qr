@@ -34,6 +34,7 @@ export default function WalletToQrPage() {
   const sessionProvider = authSession?.provider ?? null;
 
   useEffect(() => {
+    if (authStatus === "loading") return;
     const saved = sessionStorage.getItem(SS_PROVIDER_KEY);
     if (saved) {
       sessionStorage.removeItem(SS_PROVIDER_KEY);
@@ -42,7 +43,7 @@ export default function WalletToQrPage() {
         setMode("b");
       }
     }
-  }, [isSignedIn, sessionProvider]);
+  }, [authStatus, isSignedIn, sessionProvider]);
 
   const handleProviderToggle = useCallback(
     (id: string) => {

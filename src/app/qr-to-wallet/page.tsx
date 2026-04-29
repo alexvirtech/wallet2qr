@@ -48,6 +48,7 @@ export default function QrToWalletPage() {
   const providerSub = authSession?.providerSub ?? authSession?.sub;
 
   useEffect(() => {
+    if (authStatus === "loading") return;
     const savedQr = sessionStorage.getItem(SS_QR_KEY);
     if (savedQr) {
       sessionStorage.removeItem(SS_QR_KEY);
@@ -61,7 +62,7 @@ export default function QrToWalletPage() {
         setSelectedProvider(savedProvider);
       }
     }
-  }, [isSignedIn, sessionProvider]);
+  }, [authStatus, isSignedIn, sessionProvider]);
 
   const isV2 = envelope?.v === 2;
   const isV3 = envelope?.v === 3;
@@ -69,6 +70,13 @@ export default function QrToWalletPage() {
 
   const v3NeedsAccount = v3env && v3env.m === "b";
   const usesSocialFactor = selectedProvider && isSignedIn && sessionProvider === selectedProvider;
+
+  useEffect(() => {
+    if (!envelope || !isSignedIn || selectedProvider) return;
+    if (isV3 && v3NeedsAccount && v3env?.p && sessionProvider === v3env.p) {
+      setSelectedProvider(v3env.p);
+    }
+  }, [envelope, isSignedIn, selectedProvider, isV3, v3NeedsAccount, v3env, sessionProvider]);
 
   const accountMismatch = useMemo(() => {
     if (!usesSocialFactor || !providerSub) return false;
