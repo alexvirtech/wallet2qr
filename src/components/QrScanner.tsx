@@ -4,7 +4,6 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import {
   decodeQrFromImage,
   decodeQrFromImageData,
-  extractPayloadFromQrData,
 } from "@/lib/compat/qrDecoder";
 
 interface QrScannerProps {
@@ -29,7 +28,7 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
       img.onload = () => {
         const qrData = decodeQrFromImage(img);
         if (qrData) {
-          onDecoded(extractPayloadFromQrData(qrData));
+          onDecoded(qrData);
         } else {
           onError("No QR code found in the image.");
         }
@@ -50,7 +49,7 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
       img.onload = () => {
         const qrData = decodeQrFromImage(img);
         if (qrData) {
-          onDecoded(extractPayloadFromQrData(qrData));
+          onDecoded(qrData);
         } else {
           onError("No QR code found in the image.");
         }
@@ -108,9 +107,8 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
             canvas.height
           );
           if (qrData) {
-            const payload = extractPayloadFromQrData(qrData);
             stopCamera();
-            onDecoded(payload);
+            onDecoded(qrData);
             return;
           }
         }
