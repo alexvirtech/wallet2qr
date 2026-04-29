@@ -55,6 +55,8 @@ interface SignInButtonsProps {
 }
 
 export default function SignInButtons({ callbackUrl, onBeforeSignIn, compact, activeProviderId }: SignInButtonsProps) {
+  const visible = providers.filter((p) => p.id !== "apple");
+
   const handleSignIn = (providerId: string) => {
     onBeforeSignIn?.();
     signIn(providerId, callbackUrl ? { callbackUrl } : undefined);
@@ -63,14 +65,14 @@ export default function SignInButtons({ callbackUrl, onBeforeSignIn, compact, ac
   if (compact) {
     return (
       <div className="flex flex-wrap gap-2">
-        {providers.map((p) => {
+        {visible.map((p) => {
           const active = p.id === activeProviderId;
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => handleSignIn(p.id)}
-              className={`inline-flex items-center gap-1.5 text-xs font-bold py-1.5 px-3 rounded-md border transition-colors ${
+              className={`inline-flex items-center gap-1.5 text-xs font-bold py-1.5 px-3 rounded-md border transition-colors cursor-pointer ${
                 active
                   ? "border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 ring-1 ring-green-400/50"
                   : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
@@ -87,15 +89,15 @@ export default function SignInButtons({ callbackUrl, onBeforeSignIn, compact, ac
   }
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {providers.map((p) => {
+    <div className="grid grid-cols-3 gap-2">
+      {visible.map((p) => {
         const active = p.id === activeProviderId;
         return (
           <button
             key={p.id}
             type="button"
             onClick={() => handleSignIn(p.id)}
-            className={`flex items-center justify-center gap-2 text-sm font-bold py-2.5 px-3 rounded-lg border transition-all ${
+            className={`flex items-center justify-center gap-1.5 text-sm font-bold py-2 px-2 rounded-lg border transition-all cursor-pointer ${
               active
                 ? "border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20 ring-2 ring-green-400/50 shadow-sm"
                 : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 hover:shadow-sm"
