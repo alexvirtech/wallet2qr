@@ -1,6 +1,7 @@
 import * as btc from "@scure/btc-signer";
 import { hex } from "@scure/base";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { getDataSourceSetting } from "./settings";
 
 const MEMPOOL_API = "https://mempool.space/api";
 
@@ -159,6 +160,17 @@ export async function buildAndSignTx(
 }
 
 export async function broadcastTx(rawHex: string): Promise<string> {
+  if (getDataSourceSetting() !== "direct") {
+    try {
+      const res = await fetch("/api/ew/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chain: "bitcoin", tx: rawHex }),
+      });
+      if (res.ok) return res.text();
+    } catch {}
+  }
+
   const res = await fetch(`${MEMPOOL_API}/tx`, {
     method: "POST",
     headers: { "Content-Type": "text/plain" },

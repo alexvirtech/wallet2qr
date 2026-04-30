@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { signIn, useSession as useAuthSession } from "next-auth/react";
@@ -13,6 +13,12 @@ import { fetchPepper } from "@/lib/compat/fetchPepper";
 import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
 import type { EncryptionMode } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
+import StepIndicator from "@/components/StepIndicator";
+import type { Step } from "@/components/StepIndicator";
+import SecurityStatusPanel from "@/components/SecurityStatusPanel";
+import OfflineModeBanner from "@/components/OfflineModeBanner";
+
+type DeepLinkMode = "wallet" | "mnemonic";
 
 function DeepLinkHandler() {
   const searchParams = useSearchParams();
@@ -44,11 +50,14 @@ function DeepLinkHandler() {
   const [autoAttempted, setAutoAttempted] = useState(false);
   const [readOnly, setReadOnly] = useState(roParam === "1");
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [mode, setMode] = useState<DeepLinkMode>("mnemonic");
+  const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
 
   const sessionProvider = authSession?.provider ?? null;
   const v3NeedsAccount = isV3 && (encMode === "b" || encMode === "d") && !useBackup;
   const v3NeedsBackup = isV3 && (encMode === "c" || (encMode === "d" && useBackup));
   const usesSocialFactor = selectedProvider && isSignedIn && sessionProvider === selectedProvider;
+  const needsAccount = v3NeedsAccount || isV2;
   const v3AccountMismatch = v3NeedsAccount && usesSocialFactor && providerSub && ph
     ? computeProviderIdHash(providerSub) !== ph
     : false;
@@ -112,8 +121,13 @@ function DeepLinkHandler() {
           return;
         }
 
-        setSession(decrypted, pass, readOnly);
-        router.push("/wallet");
+        if (mode === "wallet") {
+          setSession(decrypted, pass, readOnly);
+          router.push("/wallet");
+        } else {
+          setRevealedMnemonic(decrypted);
+          setDecrypting(false);
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Decryption failed");
         setDecrypting(false);
@@ -169,13 +183,18 @@ function DeepLinkHandler() {
         }
       }
 
-      setSession(mnemonic, pass, readOnly, isDet);
-      router.push("/wallet");
+      if (mode === "wallet") {
+        setSession(mnemonic, pass, readOnly, isDet);
+        router.push("/wallet");
+      } else {
+        setRevealedMnemonic(mnemonic);
+        setDecrypting(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Decryption failed");
       setDecrypting(false);
     }
-  }, [ds, password, readOnly, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, usesSocialFactor, selectedProvider, provider, w1, w2, setSession, router]);
+  }, [ds, password, readOnly, mode, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, usesSocialFactor, selectedProvider, provider, w1, w2, setSession, router]);
 
   useEffect(() => {
     if (ds && pw && !autoAttempted && !isV2 && !isV3) {
@@ -184,48 +203,93 @@ function DeepLinkHandler() {
     }
   }, [ds, pw, autoAttempted, isV2, isV3, handleDecrypt]);
 
+  const v3ModeLabel = isV3
+    ? encMode === "a" ? "Password only"
+      : "Password + social account"
+    : "";
+
+  const decryptSteps: Step[] = useMemo(() => {
+    if (!ds) return [];
+    const steps: Step[] = [
+      { label: "Encrypted payload loaded from URL", status: "complete" },
+    ];
+    if (needsAccount) {
+      steps.push({
+        label: usesSocialFactor
+          ? `Social identity verified (${providerDisplayName(selectedProvider!)})`
+          : "Social identity — select and sign in",
+        status: usesSocialFactor ? "complete" : selectedProvider ? "active" : "pending",
+      });
+      if (usesSocialFactor && !v3AccountMismatch) {
+        steps.push({ label: "Stable identity factor matched", status: "complete" });
+      }
+      if (v3AccountMismatch) {
+        steps.push({ label: "Account mismatch — wrong account", status: "failed" });
+      }
+    }
+    steps.push({
+      label: "Password entered",
+      status: password.length > 0 ? "complete" : "pending",
+    });
+    steps.push({
+      label: decrypting ? "Local decryption in progress..." : revealedMnemonic ? "Decrypted locally" : "Local decryption ready",
+      status: revealedMnemonic ? "complete" : decrypting ? "active" : "pending",
+    });
+    return steps;
+  }, [ds, needsAccount, usesSocialFactor, selectedProvider, v3AccountMismatch, password, decrypting, revealedMnemonic]);
+
   if (!ds) return null;
 
   const canDecrypt = !decrypting;
+
+  if (revealedMnemonic) {
+    return (
+      <div className="w-full max-w-md mx-auto px-4 py-12 space-y-4">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+          <p className="text-xs text-yellow-600 dark:text-yellow-400 font-bold mb-2">
+            Keep this secret — never share your mnemonic!
+          </p>
+          <p className="font-mono text-sm text-gray-800 dark:text-gray-200 break-words select-all">
+            {revealedMnemonic}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setSession(revealedMnemonic, password, readOnly);
+            router.push("/wallet");
+          }}
+          className="bg-m-green hover:bg-green-600 text-white font-bold py-1.5 px-4 rounded-md text-sm"
+        >
+          Open Wallet
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md mx-auto px-4 py-12">
       <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6 space-y-4">
         <h2 className="text-xl font-bold text-center">Unlock Wallet</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-          An encrypted wallet was detected in this link. Enter your password to
-          decrypt and open it.
+          An encrypted wallet was detected in this link.
+          {isV3 && (
+            <span className="text-xs text-gray-400 ml-1">
+              v3 &middot; {v3ModeLabel}
+            </span>
+          )}
+          {isV2 && (
+            <span className="text-xs text-gray-400 ml-1">
+              v2 &middot; account-bound (legacy)
+            </span>
+          )}
+          {!isV2 && !isV3 && (
+            <span className="text-xs text-gray-400 ml-1">
+              v1 &middot; password only (legacy)
+            </span>
+          )}
         </p>
 
-        {/* Social account selector */}
-        {(isV3 || isV2) && (
-          <div className="space-y-2">
-            <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
-              Social account
-              {(v3NeedsAccount || isV2) && (
-                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
-                  required — encrypted with {providerDisplayName(isV2 ? (pep ?? "google") : (provider ?? ""))}
-                </span>
-              )}
-            </p>
-            <ProviderSelector
-              selectedId={selectedProvider}
-              onToggle={handleProviderToggle}
-              sessionProviderId={sessionProvider ?? undefined}
-              hintProviderId={isV3 ? (provider ?? undefined) : undefined}
-            />
-            {usesSocialFactor && !v3AccountMismatch && (
-              <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
-                <span className="text-xs text-green-700 dark:text-green-300">Signed in as <strong>{authSession?.user?.email}</strong></span>
-              </div>
-            )}
-            {v3AccountMismatch && (
-              <p className="text-xs text-red-600 dark:text-red-400 font-bold">This QR was bound to a different account.</p>
-            )}
-          </div>
-        )}
-
+        {/* Password */}
         <div>
           <label className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">Password</label>
           <input
@@ -238,6 +302,39 @@ function DeepLinkHandler() {
             autoFocus
           />
         </div>
+
+        {/* Social account selector (only for account-bound QRs) */}
+        {needsAccount && (
+          <div className="space-y-2">
+            <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+              Social account
+              {v3NeedsAccount && (
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
+                  required — encrypted with {providerDisplayName(provider ?? "")}
+                </span>
+              )}
+              {isV2 && (
+                <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">
+                  required — account-bound (legacy)
+                </span>
+              )}
+            </p>
+            <ProviderSelector
+              selectedId={selectedProvider}
+              onToggle={handleProviderToggle}
+              sessionProviderId={sessionProvider ?? undefined}
+            />
+            {usesSocialFactor && !v3AccountMismatch && (
+              <div className="flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-green-600 dark:text-green-400 flex-shrink-0"><polyline points="20 6 9 17 4 12" /></svg>
+                <span className="text-xs text-green-700 dark:text-green-300">Signed in as <strong>{authSession?.user?.email}</strong></span>
+              </div>
+            )}
+            {v3AccountMismatch && (
+              <p className="text-xs text-red-600 dark:text-red-400 font-bold">This QR was bound to a different account. Sign out and use the original account.</p>
+            )}
+          </div>
+        )}
 
         {/* Backup code input for v3 */}
         {v3NeedsBackup && (
@@ -253,29 +350,123 @@ function DeepLinkHandler() {
           </div>
         )}
 
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={readOnly}
-            onChange={(e) => setReadOnly(e.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-600"
-          />
-          <span className="text-sm text-gray-600 dark:text-gray-300">Read-only mode</span>
-          <span className="text-xs text-gray-400">(view balances only)</span>
-        </label>
+        {/* Mode selection */}
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+            After decryption
+          </p>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="dl-mode"
+                checked={mode === "mnemonic"}
+                onChange={() => setMode("mnemonic")}
+                className="accent-blue-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">View Mnemonic</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="dl-mode"
+                checked={mode === "wallet"}
+                onChange={() => setMode("wallet")}
+                className="accent-blue-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Open Wallet</span>
+            </label>
+            {mode === "wallet" && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={readOnly}
+                  onChange={(e) => setReadOnly(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">Read-only</span>
+              </label>
+            )}
+          </div>
+        </div>
 
         {error && <p className="text-m-red text-sm">{error}</p>}
 
         <button
           onClick={() => handleDecrypt()}
           disabled={!canDecrypt}
-          className="w-full bg-m-green hover:bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg text-sm disabled:opacity-50"
+          className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm disabled:opacity-50"
         >
-          {decrypting ? "Decrypting..." : "Decrypt & Open Wallet"}
+          {decrypting ? "Decrypting..." : "Decrypt"}
         </button>
+      </div>
+
+      {/* Security indicators */}
+      <div className="mt-6 space-y-4">
+        <OfflineModeBanner />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Progress</p>
+            <StepIndicator steps={decryptSteps} />
+          </div>
+          <SecurityStatusPanel />
+        </div>
       </div>
     </div>
   );
+}
+
+function TrustSlogans() {
+  const items = [
+    {
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-500">
+          <path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z" />
+          <polyline points="9 12 11 14 15 10" />
+        </svg>
+      ),
+      title: "Your mnemonic never leaves your device",
+      desc: "Encryption and decryption happen entirely in your browser. The server never sees your mnemonic, password, or private keys.",
+    },
+    {
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      ),
+      title: "Verify online. Encrypt offline.",
+      desc: "Social login verifies your identity. After that, you can disconnect — all sensitive operations run locally in the browser.",
+    },
+    {
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-500">
+          <rect x="2" y="7" width="20" height="14" rx="2" />
+          <path d="M16 7V5a4 4 0 0 0-8 0v2" />
+          <circle cx="12" cy="15" r="1.5" />
+        </svg>
+      ),
+      title: "No installs. No custody. No server access.",
+      desc: "Works from any device with a browser. We never store or transmit your wallet data. You remain in full control.",
+    },
+  ]
+
+  return (
+    <section className="pb-12 sm:pb-16">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {items.map((it) => (
+          <div key={it.title} className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gradient-to-b from-white to-gray-50/50 dark:from-m-blue-dark-3 dark:to-m-blue-dark-2 p-5 text-center">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+              {it.icon}
+            </div>
+            <h3 className="font-bold text-sm mb-1">{it.title}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">{it.desc}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 function TwoLayerSection() {
@@ -302,7 +493,7 @@ function TwoLayerSection() {
             </div>
             <div>
               <h3 className="font-bold text-sm">Layer 1: Password</h3>
-              <p className="text-[11px] text-gray-400">AES-256-CBC encryption</p>
+              <p className="text-[11px] text-gray-400">Argon2id + AES-256-GCM</p>
             </div>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
@@ -321,7 +512,7 @@ function TwoLayerSection() {
             </div>
             <div>
               <h3 className="font-bold text-sm">Layer 2: Account Binding</h3>
-              <p className="text-[11px] text-gray-400">HKDF-SHA256 second factor</p>
+              <p className="text-[11px] text-gray-400">Stable provider identity</p>
             </div>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
@@ -339,6 +530,68 @@ function TwoLayerSection() {
       </div>
     </section>
   );
+}
+
+function SocialLoginSection() {
+  const items = [
+    { provider: "Google", field: "sub", color: "text-blue-500" },
+    { provider: "GitHub", field: "id", color: "text-gray-700 dark:text-gray-300" },
+    { provider: "Microsoft", field: "oid", color: "text-cyan-600" },
+  ]
+
+  return (
+    <section className="pb-12 sm:pb-16">
+      <div className="rounded-2xl border border-purple-200 dark:border-purple-800 bg-gradient-to-b from-purple-50/30 to-white dark:from-purple-950/10 dark:to-m-blue-dark-2 p-6 sm:p-8">
+        <h2 className="text-lg sm:text-xl font-bold mb-2 text-center">
+          What Social Login Is (and Isn&apos;t) Used For
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 text-center max-w-xl mx-auto mb-6">
+          Social login provides a <strong className="text-gray-700 dark:text-gray-200">stable identity factor</strong> for key derivation.
+          It is never used to access, store, or transmit your wallet data.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          {items.map((p) => (
+            <div key={p.provider} className="bg-white dark:bg-m-blue-dark-3 rounded-xl p-4 text-center border border-gray-100 dark:border-gray-700">
+              <div className={`text-sm font-bold ${p.color}`}>{p.provider}</div>
+              <div className="text-[11px] text-gray-400 mt-1 font-mono">{p.field}</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">stable user identifier</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <h4 className="font-bold text-green-600 dark:text-green-400 mb-2 flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              Used for encryption
+            </h4>
+            <ul className="space-y-1 text-gray-500 dark:text-gray-400">
+              <li>Stable provider user ID (never changes)</li>
+              <li>Mixed into Argon2id key derivation</li>
+              <li>Acts as a second factor alongside your password</li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold text-red-500 mb-2 flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              Never used
+            </h4>
+            <ul className="space-y-1 text-gray-500 dark:text-gray-400">
+              <li>OAuth access tokens, refresh tokens</li>
+              <li>Email, username, profile data</li>
+              <li>Client secrets or app credentials</li>
+            </ul>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-gray-400 text-center mt-5 max-w-lg mx-auto leading-relaxed">
+          OAuth client secret expiration or token renewal does not affect your ability to decrypt old QR codes —
+          as long as you can sign in again and the provider returns the same stable user ID.
+        </p>
+      </div>
+    </section>
+  )
 }
 
 function FlowRow({ mode }: { mode: "encrypt" | "decrypt" }) {
@@ -559,21 +812,32 @@ function LandingContent() {
         <FlowDiagram />
       </section>
 
+      {/* Trust slogans */}
+      <TrustSlogans />
+
       {/* Two layers — security-first */}
       <TwoLayerSection />
 
+      {/* Social login explanation */}
+      <SocialLoginSection />
+
       {/* How it works */}
       <section className="pb-12 sm:pb-16">
-        <h2 className="text-xl sm:text-2xl font-bold text-center mb-8">
-          How It Works
-        </h2>
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-center">
+            How It Works
+          </h2>
+          <a href="/how-it-works" className="text-[10px] text-blue-500 hover:text-blue-700 font-bold border border-blue-200 dark:border-blue-800 rounded px-2 py-0.5">
+            detailed view
+          </a>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6 text-center">
             <div className="text-3xl mb-3">1</div>
             <h3 className="font-bold mb-2">Encrypt</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your mnemonic, set a password, and sign in with your account.
-              Wallet2QR encrypts with AES-256 using both factors and renders a QR code.
+              Enter your mnemonic, set a password, and optionally bind to your social account.
+              Everything is encrypted locally with Argon2id + AES-256-GCM.
             </p>
           </div>
           <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-xl p-6 text-center">
@@ -588,8 +852,8 @@ function LandingContent() {
             <div className="text-3xl mb-3">3</div>
             <h3 className="font-bold mb-2">Scan & Unlock</h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Scan the QR with your phone camera. Sign in with the same account,
-              enter your password — both are required to unlock the wallet.
+              Scan the QR with any phone camera. Sign in with the same account,
+              enter your password — decryption happens locally in the browser.
             </p>
           </div>
         </div>
@@ -614,8 +878,8 @@ function LandingContent() {
               desc: "Bitcoin, Ethereum, Arbitrum, BNB Chain, Avalanche, and Solana. View balances, send, receive, and exchange across chains.",
             },
             {
-              title: "Zero Storage",
-              desc: "Your mnemonic lives only in memory during the session. Nothing is written to localStorage or sent to any server.",
+              title: "Browser-Only Encryption",
+              desc: "All cryptography runs in your browser via WebCrypto and Argon2id. Your mnemonic and password are never transmitted to any server.",
             },
             {
               title: "QR Deep Links",
@@ -626,8 +890,8 @@ function LandingContent() {
               desc: "Swap tokens across supported chains via LI.FI aggregation — directly from your browser wallet.",
             },
             {
-              title: "Auto-Lock",
-              desc: "Wallet automatically locks after 5 minutes of inactivity. Your mnemonic is cleared from memory.",
+              title: "Manual Lock",
+              desc: "Lock your wallet with one tap when you're done. Your mnemonic is cleared from memory on lock.",
             },
           ].map((f) => (
             <div

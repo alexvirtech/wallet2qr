@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
-import type { UiMode, CustomToken } from "@/lib/wallet/settings";
+import type { UiMode, CustomToken, DataSource } from "@/lib/wallet/settings";
 import { allNetworks, allNetworkKeys } from "@/lib/wallet/networks";
 import { getAssetsForNetwork } from "@/lib/wallet/assets";
 import { deriveAccount } from "@/lib/wallet/derive";
@@ -29,6 +29,7 @@ export default function SettingsPage() {
   const {
     settings,
     setMode,
+    setDataSource,
     addNetwork,
     removeNetwork,
     toggleNetworkVisible,
@@ -204,6 +205,44 @@ export default function SettingsPage() {
       {/* Networks & Assets tab */}
       {tab === "assets" && (
         <div className="space-y-8">
+          <section>
+            <h2 className="text-lg font-bold mb-3">Data Source</h2>
+            <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded-lg p-4 space-y-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Choose how blockchain data (balances, prices, transactions) is fetched.
+              </p>
+              <div className="flex gap-3">
+                {(
+                  [
+                    { value: "extrawallet" as DataSource, label: "ExtraWallet API", desc: "Aggregated API with fast multi-chain queries" },
+                    { value: "direct" as DataSource, label: "Direct (Public RPCs)", desc: "Public RPC nodes, mempool.space, CoinGecko" },
+                  ] as const
+                ).map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={`flex-1 flex items-start gap-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                      settings.dataSource === opt.value
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="dataSource"
+                      checked={settings.dataSource === opt.value}
+                      onChange={() => setDataSource(opt.value)}
+                      className="mt-0.5 accent-blue-500"
+                    />
+                    <div>
+                      <span className="text-sm font-bold">{opt.label}</span>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </section>
+
           <section>
             <h2 className="text-lg font-bold mb-3">Active Networks</h2>
             {activeKeys.length === 0 && (

@@ -11,6 +11,8 @@ import { providerDisplayName } from "@/components/SignInButtons";
 const links = [
   { href: "/wallet-to-qr", label: "Wallet → QR" },
   { href: "/qr-to-wallet", label: "QR → Wallet" },
+  { href: "/how-it-works", label: "How It Works" },
+  { href: "/about", label: "About" },
 ];
 
 export default function Nav() {

@@ -12,12 +12,20 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum, mainnet, avalanche, bsc } from "viem/chains";
 import type { NetworkConfig, TokenConfig } from "./networks";
+import { getDataSourceSetting } from "./settings";
 
 const chainMap: Record<number, Chain> = {
   [arbitrum.id]: arbitrum,
   [mainnet.id]: mainnet,
   [avalanche.id]: avalanche,
   [bsc.id]: bsc,
+};
+
+const PUBLIC_RPCS: Record<number, string> = {
+  [mainnet.id]: "https://cloudflare-eth.com",
+  [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
+  [avalanche.id]: "https://api.avax.network/ext/bc/C/rpc",
+  [bsc.id]: "https://bsc-dataseed1.binance.org",
 };
 
 function getChain(network: NetworkConfig): Chain {
@@ -29,6 +37,13 @@ function getChain(network: NetworkConfig): Chain {
   };
 }
 
+function getRpcUrl(network: NetworkConfig): string {
+  if (getDataSourceSetting() === "direct") {
+    return PUBLIC_RPCS[network.chainId] || network.rpcUrl;
+  }
+  return network.rpcUrl;
+}
+
 export async function estimateGas(
   network: NetworkConfig,
   from: Address,
@@ -36,9 +51,10 @@ export async function estimateGas(
   value: bigint
 ) {
   const chain = getChain(network);
+  const rpc = getRpcUrl(network);
   const client = createPublicClient({
     chain,
-    transport: fallback([http(network.rpcUrl), http()]),
+    transport: fallback([http(rpc), http()]),
   });
   const gasEstimate = await client.estimateGas({ account: from, to, value });
   const gasPrice = await client.getGasPrice();
@@ -52,11 +68,12 @@ export async function sendNative(
   amount: string
 ): Promise<Hex> {
   const chain = getChain(network);
+  const rpc = getRpcUrl(network);
   const account = privateKeyToAccount(privateKey);
   const client = createWalletClient({
     account,
     chain,
-    transport: http(network.rpcUrl),
+    transport: fallback([http(rpc), http()]),
   });
   const value = parseUnits(amount, network.nativeCurrency.decimals);
   return client.sendTransaction({ to, value, chain });
@@ -70,11 +87,12 @@ export async function sendToken(
   amount: string
 ): Promise<Hex> {
   const chain = getChain(network);
+  const rpc = getRpcUrl(network);
   const account = privateKeyToAccount(privateKey);
   const client = createWalletClient({
     account,
     chain,
-    transport: http(network.rpcUrl),
+    transport: fallback([http(rpc), http()]),
   });
   const value = parseUnits(amount, token.decimals);
   return client.writeContract({

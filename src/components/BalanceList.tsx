@@ -23,6 +23,54 @@ import type { Address } from "viem";
 
 const FETCH_TIMEOUT = 10_000;
 
+const PUBLIC_RPCS: Record<string, string> = {
+  ethereum: "https://cloudflare-eth.com",
+  arbitrum: "https://arb1.arbitrum.io/rpc",
+  avalanche: "https://api.avax.network/ext/bc/C/rpc",
+  bnb: "https://bsc-dataseed1.binance.org",
+  solana: "https://api.mainnet-beta.solana.com",
+};
+
+function withPublicRpcs(accounts: NetworkAccount[]): NetworkAccount[] {
+  return accounts.map((a) => {
+    const rpc = PUBLIC_RPCS[a.networkKey];
+    if (!rpc) return a;
+    return { ...a, network: { ...a.network, rpcUrl: rpc } };
+  });
+}
+
+const NETWORK_KEY_TO_EW: Record<string, string> = {
+  ethereum: "ethereum",
+  arbitrum: "arbitrum",
+  avalanche: "avalanche",
+  bnb: "bsc",
+  solana: "solana",
+  bitcoin: "bitcoin",
+  dogecoin: "dogecoin",
+};
+
+const EW_BLOCKCHAIN_TO_KEY: Record<string, string> = {
+  ethereum: "ethereum",
+  arbitrum: "arbitrum",
+  avalanche: "avalanche",
+  bsc: "bnb",
+  solana: "solana",
+  bitcoin: "bitcoin",
+  dogecoin: "dogecoin",
+};
+
+interface EwBalanceItem {
+  blockchain: string;
+  tokenSymbol: string;
+  tokenName: string;
+  tokenDecimals: number;
+  contractAddress: string | null;
+  tokenType: string;
+  balance: string | null;
+  balanceUsd: string | null;
+  tokenPrice: string | null;
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
@@ -167,6 +215,112 @@ async function refreshViaProxy(
   return items;
 }
 
+async function refreshViaExtraWallet(
+  accounts: NetworkAccount[],
+  getVisibleTokens: (key: string) => string[],
+): Promise<BalanceItem[]> {
+  const networks: Record<string, string[]> = {};
+  for (const { networkKey, address } of accounts) {
+    const ewId = NETWORK_KEY_TO_EW[networkKey];
+    if (!ewId) continue;
+    if (!networks[ewId]) networks[ewId] = [];
+    if (!networks[ewId].includes(address)) networks[ewId].push(address);
+  }
+
+  const [ewRes, prices] = await Promise.all([
+    fetch("/api/ew/balance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ networks }),
+    }).then((r) => {
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.json() as Promise<EwBalanceItem[]>;
+    }),
+    fetchPrices(),
+  ]);
+
+  const balanceMap = new Map<string, { balance: string; price: number; usd: number }>();
+  for (const item of ewRes) {
+    const nk = EW_BLOCKCHAIN_TO_KEY[item.blockchain];
+    if (!nk) continue;
+    const key = item.contractAddress
+      ? `${nk}:${item.contractAddress.toLowerCase()}`
+      : `${nk}:NATIVE`;
+    balanceMap.set(key, {
+      balance: item.balance ?? "0",
+      price: parseFloat(item.tokenPrice ?? "0"),
+      usd: parseFloat(item.balanceUsd ?? "0"),
+    });
+  }
+
+  const items: BalanceItem[] = [];
+
+  for (const { network, address, networkKey } of accounts) {
+    const visibleSymbols = getVisibleTokens(networkKey);
+    const assetDefs = getAssetsForNetwork(network.key);
+    const nativeDecimals = network.nativeCurrency.decimals === 8 ? 8 : 4;
+    const isSupported = !!NETWORK_KEY_TO_EW[networkKey];
+
+    if (visibleSymbols.includes(network.nativeCurrency.symbol)) {
+      let raw = 0, usd = 0, balStr = "0";
+
+      if (isSupported) {
+        const entry = balanceMap.get(`${networkKey}:NATIVE`);
+        raw = entry ? parseFloat(entry.balance) : 0;
+        usd = entry?.usd ?? raw * (prices[network.nativeCurrency.symbol] ?? 0);
+        balStr = entry?.balance ?? "0";
+      } else {
+        try {
+          if (network.chainType === "zcash") {
+            const result = await getZecBalance(address);
+            raw = parseFloat(result.formatted);
+            balStr = result.formatted;
+          }
+        } catch {}
+        usd = raw * (prices[network.nativeCurrency.symbol] ?? 0);
+      }
+
+      const nativeDef = assetDefs.find((a) => a.symbol === network.nativeCurrency.symbol);
+      items.push({
+        symbol: network.nativeCurrency.symbol,
+        name: network.nativeCurrency.name,
+        balance: formatBalance(balStr, nativeDecimals),
+        rawBalance: raw,
+        usdValue: formatUsd(usd),
+        usdNum: usd,
+        category: nativeDef?.category ?? "gas",
+        address: "",
+        tokenType: "native",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+
+    for (const token of network.tokens) {
+      if (!visibleSymbols.includes(token.symbol)) continue;
+      const entry = balanceMap.get(`${networkKey}:${token.address.toLowerCase()}`);
+      const raw = entry ? parseFloat(entry.balance) : 0;
+      const usd = entry?.usd ?? raw * (prices[token.symbol] ?? 0);
+      const def = assetDefs.find((a) => a.symbol === token.symbol);
+      items.push({
+        symbol: token.symbol,
+        name: token.name,
+        balance: formatBalance(raw === 0 ? "0" : entry?.balance ?? "0"),
+        rawBalance: raw,
+        usdValue: formatUsd(usd),
+        usdNum: usd,
+        category: def?.category ?? "ecosystem",
+        address: token.address,
+        tokenType: "token",
+        networkKey,
+        networkName: network.name,
+      });
+    }
+  }
+
+  return items;
+}
+
 interface BalanceTask {
   symbol: string;
   name: string;
@@ -265,7 +419,7 @@ async function refreshDirect(
 }
 
 export default function BalanceList({ accounts, hideZero, onTotalChange, isDeterministic }: BalanceListProps) {
-  const { getVisibleTokens, getDerivationPath } = useSettings();
+  const { settings, getVisibleTokens, getDerivationPath } = useSettings();
   const { readOnly } = useSession();
 
   const zeroBalances = useMemo(() => {
@@ -322,14 +476,22 @@ export default function BalanceList({ accounts, hideZero, onTotalChange, isDeter
     setError(null);
     try {
       let items: BalanceItem[];
-      if (isProxyEnabled()) {
-        try {
-          items = await refreshViaProxy(accounts, getVisibleTokens);
-        } catch {
-          items = await refreshDirect(accounts, getVisibleTokens);
-        }
+      if (settings.dataSource === "direct") {
+        items = await refreshDirect(withPublicRpcs(accounts), getVisibleTokens);
       } else {
-        items = await refreshDirect(accounts, getVisibleTokens);
+        try {
+          items = await refreshViaExtraWallet(accounts, getVisibleTokens);
+        } catch {
+          if (isProxyEnabled()) {
+            try {
+              items = await refreshViaProxy(accounts, getVisibleTokens);
+            } catch {
+              items = await refreshDirect(accounts, getVisibleTokens);
+            }
+          } else {
+            items = await refreshDirect(accounts, getVisibleTokens);
+          }
+        }
       }
 
       setBalances(items);
@@ -343,7 +505,7 @@ export default function BalanceList({ accounts, hideZero, onTotalChange, isDeter
     } finally {
       setLoading(false);
     }
-  }, [accounts, getVisibleTokens, isDeterministic]);
+  }, [accounts, getVisibleTokens, isDeterministic, settings.dataSource]);
 
   useEffect(() => {
     if (isDeterministic) {

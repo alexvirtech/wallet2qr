@@ -21,6 +21,7 @@ export type UiMode = "simple" | "advanced";
 export type PaymentAssetPref = "USDT" | "USDC" | "auto";
 export type PaymentNetworkPref = "auto" | string;
 export type RoutingMode = "lowest_fee" | "fastest" | "best_liquidity" | "manual";
+export type DataSource = "extrawallet" | "direct";
 
 interface TokenSetting {
   added: boolean;
@@ -58,6 +59,7 @@ export interface WalletSettings {
   preferredPaymentNetwork: PaymentNetworkPref;
   routingMode: RoutingMode;
   customTokens: CustomToken[];
+  dataSource: DataSource;
 }
 
 const STORAGE_KEY = "wallet2qr_settings";
@@ -95,6 +97,7 @@ function buildDefaultSettings(): WalletSettings {
     preferredPaymentNetwork: "auto",
     routingMode: "lowest_fee",
     customTokens: [],
+    dataSource: "extrawallet",
   };
 }
 
@@ -111,6 +114,7 @@ function loadSettings(): WalletSettings {
     if (!stored.preferredPaymentNetwork) stored.preferredPaymentNetwork = defaults.preferredPaymentNetwork;
     if (!stored.routingMode) stored.routingMode = defaults.routingMode;
     if (!stored.customTokens) stored.customTokens = [];
+    if (!stored.dataSource) stored.dataSource = defaults.dataSource;
 
     for (const key of Object.keys(defaults.networks)) {
       if (!stored.networks[key]) {
@@ -158,6 +162,7 @@ function saveSettings(s: WalletSettings) {
 interface SettingsContextValue {
   settings: WalletSettings;
   setMode: (mode: UiMode) => void;
+  setDataSource: (ds: DataSource) => void;
   setPaymentAssetPref: (pref: PaymentAssetPref) => void;
   setPaymentNetworkPref: (pref: PaymentNetworkPref) => void;
   setRoutingMode: (mode: RoutingMode) => void;
@@ -199,6 +204,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     (mode: UiMode) => {
       const next = structuredClone(settings);
       next.mode = mode;
+      persist(next);
+    },
+    [settings, persist]
+  );
+
+  const setDataSource = useCallback(
+    (ds: DataSource) => {
+      const next = structuredClone(settings);
+      next.dataSource = ds;
       persist(next);
     },
     [settings, persist]
@@ -475,6 +489,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       value={{
         settings,
         setMode,
+        setDataSource,
         setPaymentAssetPref,
         setPaymentNetworkPref,
         setRoutingMode,
@@ -505,4 +520,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
 export function useSettings() {
   return useContext(SettingsContext);
+}
+
+export function getDataSourceSetting(): DataSource {
+  if (typeof window === "undefined") return "extrawallet";
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return "extrawallet";
+    const parsed = JSON.parse(raw);
+    return parsed?.dataSource || "extrawallet";
+  } catch {
+    return "extrawallet";
+  }
 }

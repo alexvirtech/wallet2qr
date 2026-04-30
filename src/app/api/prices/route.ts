@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+const EW_BASE = process.env.EXTRAWALLET_API_URL || "https://api-staging.extrawallet.app";
+const EW_KEY = process.env.EXTRAWALLET_API_KEY || "";
+
 const CACHE_TTL = 60_000;
 const COINGECKO_IDS = [
   "ethereum",
@@ -23,6 +26,28 @@ const COINGECKO_IDS = [
   "zcash",
 ];
 
+const ID_TO_SYMBOL: Record<string, string> = {
+  ethereum: "ETH",
+  "avalanche-2": "AVAX",
+  arbitrum: "ARB",
+  tether: "USDT",
+  solana: "SOL",
+  "usd-coin": "USDC",
+  bitcoin: "BTC",
+  binancecoin: "BNB",
+  chainlink: "LINK",
+  uniswap: "UNI",
+  gmx: "GMX",
+  joe: "JOE",
+  benqi: "QI",
+  "jupiter-exchange-solana": "JUP",
+  "pyth-network": "PYTH",
+  "pancakeswap-token": "CAKE",
+  "first-digital-usd": "FDUSD",
+  dogecoin: "DOGE",
+  zcash: "ZEC",
+};
+
 const defaultPrices: Record<string, number> = {
   ETH: 0, AVAX: 0, ARB: 0, SOL: 0, BTC: 0, BNB: 0,
   USDT: 1, USDC: 1, FDUSD: 1,
@@ -33,28 +58,33 @@ const defaultPrices: Record<string, number> = {
 
 let cache: { prices: Record<string, number>; timestamp: number } | null = null;
 
+function mapExtraWalletResponse(data: Record<string, { price?: number }>): Record<string, number> {
+  const prices: Record<string, number> = { ...defaultPrices };
+  for (const [id, info] of Object.entries(data)) {
+    const symbol = ID_TO_SYMBOL[id];
+    if (symbol && info.price != null) prices[symbol] = info.price;
+  }
+  return prices;
+}
+
 function mapCoinGeckoResponse(data: Record<string, { usd?: number }>): Record<string, number> {
-  return {
-    ETH: data.ethereum?.usd ?? 0,
-    AVAX: data["avalanche-2"]?.usd ?? 0,
-    ARB: data.arbitrum?.usd ?? 0,
-    USDT: data.tether?.usd ?? 1,
-    SOL: data.solana?.usd ?? 0,
-    USDC: data["usd-coin"]?.usd ?? 1,
-    BTC: data.bitcoin?.usd ?? 0,
-    BNB: data.binancecoin?.usd ?? 0,
-    LINK: data.chainlink?.usd ?? 0,
-    UNI: data.uniswap?.usd ?? 0,
-    GMX: data.gmx?.usd ?? 0,
-    JOE: data.joe?.usd ?? 0,
-    QI: data.benqi?.usd ?? 0,
-    JUP: data["jupiter-exchange-solana"]?.usd ?? 0,
-    PYTH: data["pyth-network"]?.usd ?? 0,
-    CAKE: data["pancakeswap-token"]?.usd ?? 0,
-    FDUSD: data["first-digital-usd"]?.usd ?? 1,
-    DOGE: data.dogecoin?.usd ?? 0,
-    ZEC: data.zcash?.usd ?? 0,
-  };
+  const prices: Record<string, number> = { ...defaultPrices };
+  for (const [id, info] of Object.entries(data)) {
+    const symbol = ID_TO_SYMBOL[id];
+    if (symbol && info.usd != null) prices[symbol] = info.usd;
+  }
+  return prices;
+}
+
+async function fetchFromExtraWallet(): Promise<Record<string, number>> {
+  const ids = COINGECKO_IDS.join(",");
+  const res = await fetch(`${EW_BASE}/price/coin?coin_ids=${ids}`, {
+    headers: { ...(EW_KEY ? { "x-api-key": EW_KEY } : {}) },
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`ExtraWallet prices ${res.status}`);
+  return mapExtraWalletResponse(await res.json());
 }
 
 async function fetchFromCoinGecko(): Promise<Record<string, number>> {
@@ -77,7 +107,12 @@ export async function GET() {
   }
 
   try {
-    const prices = await fetchFromCoinGecko();
+    let prices: Record<string, number>;
+    try {
+      prices = await fetchFromExtraWallet();
+    } catch {
+      prices = await fetchFromCoinGecko();
+    }
     cache = { prices, timestamp: now };
     return NextResponse.json(prices, {
       headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=30" },

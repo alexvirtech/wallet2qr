@@ -14,6 +14,10 @@ import { fetchPepper } from "@/lib/compat/fetchPepper";
 import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
 import { sha256 } from "@noble/hashes/sha256";
+import StepIndicator from "@/components/StepIndicator";
+import type { Step } from "@/components/StepIndicator";
+import SecurityStatusPanel from "@/components/SecurityStatusPanel";
+import OfflineModeBanner from "@/components/OfflineModeBanner";
 
 const SS_QR_KEY = "w2q_pending_qr";
 const SS_PROVIDER_KEY = "w2q_decrypt_provider";
@@ -255,6 +259,36 @@ export default function QrToWalletPage() {
       : "Password + social account"
     : "";
 
+  const decryptSteps: Step[] = useMemo(() => {
+    if (!rawQrUrl) return []
+    const steps: Step[] = [
+      { label: "QR scanned — encrypted payload loaded", status: "complete" },
+    ]
+    if (needsAccount) {
+      steps.push({
+        label: usesSocialFactor
+          ? `Social identity verified (${providerDisplayName(selectedProvider!)})`
+          : "Social identity — select and sign in",
+        status: usesSocialFactor ? "complete" : selectedProvider ? "active" : "pending",
+      })
+      if (usesSocialFactor && !accountMismatch) {
+        steps.push({ label: "Stable identity factor matched", status: "complete" })
+      }
+      if (accountMismatch) {
+        steps.push({ label: "Account mismatch — wrong account", status: "failed" })
+      }
+    }
+    steps.push({
+      label: "Password entered",
+      status: password.length > 0 ? "complete" : "pending",
+    })
+    steps.push({
+      label: decrypting ? "Local decryption in progress..." : revealedMnemonic ? "Decrypted locally" : "Local decryption ready",
+      status: revealedMnemonic ? "complete" : decrypting ? "active" : "pending",
+    })
+    return steps
+  }, [rawQrUrl, needsAccount, usesSocialFactor, selectedProvider, accountMismatch, password, decrypting, revealedMnemonic])
+
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-2xl sm:text-3xl font-bold mb-2">QR &rarr; Wallet</h1>
@@ -424,6 +458,20 @@ export default function QrToWalletPage() {
       )}
 
       {!rawQrUrl && error && <p className="text-m-red text-sm mt-4">{error}</p>}
+
+      {/* Security indicators */}
+      {rawQrUrl && !revealedMnemonic && (
+        <div className="mt-6 space-y-4">
+          <OfflineModeBanner />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Progress</p>
+              <StepIndicator steps={decryptSteps} />
+            </div>
+            <SecurityStatusPanel />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

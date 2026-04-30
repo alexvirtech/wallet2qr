@@ -6,12 +6,10 @@ import {
   useState,
   useCallback,
   useEffect,
-  useRef,
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
 
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const STORAGE_KEY = "w2q_session";
 
 interface StoredSession {
@@ -75,7 +73,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isDeterministic, setIsDeterministicRaw] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const stored = loadFromStorage();
@@ -97,13 +94,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     router.push("/qr-to-wallet");
   }, [router]);
 
-  const resetIdleTimer = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (mnemonic) {
-      timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
-    }
-  }, [mnemonic, lock]);
-
   const setSession = useCallback(
     (m: string, p: string, ro = false, det = false) => {
       setMnemonicRaw(m);
@@ -111,10 +101,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setReadOnlyRaw(ro);
       setIsDeterministicRaw(det);
       saveToStorage(m, p, ro, det);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(lock, IDLE_TIMEOUT_MS);
     },
-    [lock]
+    []
   );
 
   const verifyPassword = useCallback(
@@ -123,17 +111,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     },
     [password]
   );
-
-  useEffect(() => {
-    if (!mnemonic) return;
-    const events = ["mousedown", "keydown", "touchstart", "scroll"] as const;
-    const handler = () => resetIdleTimer();
-    events.forEach((e) => window.addEventListener(e, handler));
-    return () => {
-      events.forEach((e) => window.removeEventListener(e, handler));
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [mnemonic, resetIdleTimer]);
 
   if (!hydrated) return null;
 

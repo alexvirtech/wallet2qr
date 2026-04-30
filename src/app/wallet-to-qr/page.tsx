@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, useSession as useAuthSession } from "next-auth/react";
 import MnemonicInput from "@/components/MnemonicInput";
@@ -13,6 +13,10 @@ import { buildQrUrlV3 } from "@/lib/compat/qrPayload";
 import { encryptV3 } from "@/lib/compat/cryptoV3";
 import type { EncryptionMode } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
+import StepIndicator from "@/components/StepIndicator";
+import type { Step } from "@/components/StepIndicator";
+import SecurityStatusPanel from "@/components/SecurityStatusPanel";
+import OfflineModeBanner from "@/components/OfflineModeBanner";
 
 const SS_PROVIDER_KEY = "w2q_encrypt_provider";
 
@@ -126,6 +130,33 @@ export default function WalletToQrPage() {
     setMode("a");
     setSelectedProvider(null);
   }, []);
+
+  const hasMnemonic = mnemonic.trim().length > 0
+  const hasPassword = password.length > 0
+  const socialVerified = mode === "b" && selectedProvider && isSignedIn && sessionProvider === selectedProvider
+
+  const encryptSteps: Step[] = useMemo(() => {
+    const steps: Step[] = []
+    if (mode === "b") {
+      steps.push({
+        label: socialVerified ? `Social identity verified (${providerDisplayName(selectedProvider!)})` : "Social identity — select and sign in",
+        status: socialVerified ? "complete" : selectedProvider ? "active" : "pending",
+      })
+    }
+    steps.push({
+      label: "Mnemonic entered locally",
+      status: hasMnemonic ? "complete" : "pending",
+    })
+    steps.push({
+      label: "Password entered",
+      status: hasPassword ? "complete" : "pending",
+    })
+    steps.push({
+      label: encrypting ? "Local Argon2id key derivation + AES-256-GCM encryption..." : qrData ? "Encrypted & QR generated locally" : "Local encryption ready",
+      status: qrData ? "complete" : encrypting ? "active" : "pending",
+    })
+    return steps
+  }, [mode, socialVerified, selectedProvider, hasMnemonic, hasPassword, encrypting, qrData])
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
@@ -341,6 +372,18 @@ export default function WalletToQrPage() {
           )}
         </div>
       </form>
+
+      {/* Security indicators */}
+      <div className="mt-6 space-y-4">
+        <OfflineModeBanner />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Progress</p>
+            <StepIndicator steps={encryptSteps} />
+          </div>
+          <SecurityStatusPanel />
+        </div>
+      </div>
     </div>
   );
 }

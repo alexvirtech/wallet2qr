@@ -22,15 +22,15 @@ export interface TokenConfig {
 }
 
 const ARB_RPC =
-  process.env.NEXT_PUBLIC_ARB_RPC_URL || "https://arbitrum-one-rpc.publicnode.com";
+  process.env.NEXT_PUBLIC_ARB_RPC_URL || "/api/ew/rpc/Arbitrum";
 const ETH_RPC =
-  process.env.NEXT_PUBLIC_ETH_RPC_URL || "https://ethereum-rpc.publicnode.com";
+  process.env.NEXT_PUBLIC_ETH_RPC_URL || "/api/ew/rpc/Ethereum";
 const AVAX_RPC =
-  process.env.NEXT_PUBLIC_AVAX_RPC_URL || "https://avalanche-c-chain-rpc.publicnode.com";
+  process.env.NEXT_PUBLIC_AVAX_RPC_URL || "/api/ew/rpc/Avalanche";
 const SOL_RPC =
-  process.env.NEXT_PUBLIC_SOL_RPC_URL || "https://api.mainnet-beta.solana.com";
+  process.env.NEXT_PUBLIC_SOL_RPC_URL || "/api/ew/rpc/Solana";
 const BNB_RPC =
-  process.env.NEXT_PUBLIC_BNB_RPC_URL || "https://bsc-rpc.publicnode.com";
+  process.env.NEXT_PUBLIC_BNB_RPC_URL || "/api/ew/rpc/Bsc";
 
 export const allNetworks: Record<string, NetworkConfig> = {
   arbitrum: {

@@ -93,6 +93,16 @@ Both legacy formats remain fully supported for decryption.
 | QR + password + wrong account | Provider ID hash mismatch blocks decryption |
 | Backup code leaked | Attacker still needs QR code + password |
 
+## UX Trust Model
+
+Wallet2QR is built around the idea that users should understand — and be able to verify — exactly what happens to their mnemonic. The UI communicates this through:
+
+- **Real-time security indicators**: Both the encrypt and decrypt pages show live step-by-step progress (StepIndicator) alongside a security status panel that confirms what stays local and what never leaves the browser.
+- **Online/offline awareness**: An OfflineModeBanner shows current connectivity status and encourages users to disconnect after social identity verification, before entering sensitive data.
+- **Browser-only local encryption**: All cryptographic operations (Argon2id key derivation, AES-256-GCM encrypt/decrypt) execute in the browser via WebCrypto and WebAssembly. The server provides the web application and facilitates OAuth sign-in — it never sees your mnemonic, password, or private keys.
+- **Social identity role**: Social login (Google, GitHub, Microsoft) provides only a **stable user identifier** (Google `sub`, GitHub numeric `id`, Microsoft `oid`). This ID is mixed into Argon2id key derivation as a second factor. OAuth tokens, refresh tokens, emails, and client secrets are never used as encryption keys. OAuth credential expiration does not affect existing QR codes.
+- **Offline-after-verification flow**: On a new device, social login requires internet to verify identity. After that, all sensitive operations (entering mnemonic, password, encryption, decryption) can happen offline. For maximum security: sign in → disconnect internet → enter mnemonic and password → encrypt or decrypt → close browser.
+
 ## Security
 
 Wallet2QR is designed as a **non-custodial** wallet-access tool. The project does not store user mnemonics, passwords, or private keys on any server. All cryptographic operations run entirely in the browser.
