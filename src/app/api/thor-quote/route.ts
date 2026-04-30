@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const THORNODE = "https://thornode.ninerealms.com/thorchain/quote/swap";
+const THORNODES = [
+  "https://thornode.thorchain.liquify.com/thorchain/quote/swap",
+  "https://thornode.ninerealms.com/thorchain/quote/swap",
+];
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams.toString();
@@ -8,17 +11,24 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
   }
 
-  try {
-    const res = await fetch(`${THORNODE}?${params}`, { redirect: "follow" });
-    const data = await res.json();
-    if (!res.ok) {
-      return NextResponse.json(data, { status: res.status });
+  for (const node of THORNODES) {
+    try {
+      const res = await fetch(`${node}?${params}`, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(10_000),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return NextResponse.json(data, { status: res.status });
+      }
+      return NextResponse.json(data);
+    } catch {
+      continue;
     }
-    return NextResponse.json(data);
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "THORChain API unreachable" },
-      { status: 502 }
-    );
   }
+
+  return NextResponse.json(
+    { error: "All THORChain nodes unreachable" },
+    { status: 502 }
+  );
 }
