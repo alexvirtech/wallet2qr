@@ -22,10 +22,10 @@ const chainMap: Record<number, Chain> = {
 };
 
 const PUBLIC_RPCS: Record<number, string> = {
-  [mainnet.id]: "https://cloudflare-eth.com",
-  [arbitrum.id]: "https://arb1.arbitrum.io/rpc",
-  [avalanche.id]: "https://api.avax.network/ext/bc/C/rpc",
-  [bsc.id]: "https://bsc-dataseed1.binance.org",
+  [mainnet.id]: "https://ethereum-rpc.publicnode.com",
+  [arbitrum.id]: "https://arbitrum-one-rpc.publicnode.com",
+  [avalanche.id]: "https://avalanche-c-chain-rpc.publicnode.com",
+  [bsc.id]: "https://bsc-rpc.publicnode.com",
 };
 
 function getChain(network: NetworkConfig): Chain {

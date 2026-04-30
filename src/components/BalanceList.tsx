@@ -24,11 +24,11 @@ import type { Address } from "viem";
 const FETCH_TIMEOUT = 10_000;
 
 const PUBLIC_RPCS: Record<string, string> = {
-  ethereum: "https://cloudflare-eth.com",
-  arbitrum: "https://arb1.arbitrum.io/rpc",
-  avalanche: "https://api.avax.network/ext/bc/C/rpc",
-  bnb: "https://bsc-dataseed1.binance.org",
-  solana: "https://api.mainnet-beta.solana.com",
+  ethereum: "https://ethereum-rpc.publicnode.com",
+  arbitrum: "https://arbitrum-one-rpc.publicnode.com",
+  avalanche: "https://avalanche-c-chain-rpc.publicnode.com",
+  bnb: "https://bsc-rpc.publicnode.com",
+  solana: "https://solana-rpc.publicnode.com",
 };
 
 function withPublicRpcs(accounts: NetworkAccount[]): NetworkAccount[] {
@@ -670,7 +670,7 @@ function AssetDetailModal({
         : `${blockExplorer}/token/${asset.address}`;
 
   const canSend = !readOnly && (chainType === "evm" || chainType === "bitcoin");
-  const canExchange = !readOnly && chainType === "evm";
+  const canExchange = !readOnly;
 
   return (
     <div
