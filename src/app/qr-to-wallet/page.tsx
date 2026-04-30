@@ -255,8 +255,6 @@ export default function QrToWalletPage() {
       : "Password + social account"
     : "";
 
-  const hintProvider = v3env?.p ?? undefined;
-
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-2xl sm:text-3xl font-bold mb-2">QR &rarr; Wallet</h1>
@@ -344,7 +342,6 @@ export default function QrToWalletPage() {
                 selectedId={selectedProvider}
                 onToggle={handleProviderToggle}
                 sessionProviderId={sessionProvider ?? undefined}
-                hintProviderId={hintProvider}
               />
 
               {selectedProvider && isSignedIn && sessionProvider === selectedProvider && !accountMismatch && (
