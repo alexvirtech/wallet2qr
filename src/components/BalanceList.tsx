@@ -476,8 +476,9 @@ export default function BalanceList({ accounts, hideZero, onTotalChange, isDeter
     setError(null);
     try {
       let items: BalanceItem[];
+      const directAccounts = withPublicRpcs(accounts);
       if (settings.dataSource === "direct") {
-        items = await refreshDirect(withPublicRpcs(accounts), getVisibleTokens);
+        items = await refreshDirect(directAccounts, getVisibleTokens);
       } else {
         try {
           items = await refreshViaExtraWallet(accounts, getVisibleTokens);
@@ -486,10 +487,10 @@ export default function BalanceList({ accounts, hideZero, onTotalChange, isDeter
             try {
               items = await refreshViaProxy(accounts, getVisibleTokens);
             } catch {
-              items = await refreshDirect(accounts, getVisibleTokens);
+              items = await refreshDirect(directAccounts, getVisibleTokens);
             }
           } else {
-            items = await refreshDirect(accounts, getVisibleTokens);
+            items = await refreshDirect(directAccounts, getVisibleTokens);
           }
         }
       }
