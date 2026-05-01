@@ -34,7 +34,7 @@ function computeSubHash(sub: string): string {
 type Mode = "mnemonic" | "wallet2qr" | "extrasafe" | "tinywallet";
 
 const EXTRASAFE_URL = "https://www.extrasafe.online";
-const TINYWALLET_URL = "https://tiny-wallet.com";
+const TINYWALLET_URL = "https://www.tiny-wallet.com";
 
 export default function QrToWalletPage() {
   const [rawQrUrl, setRawQrUrl] = useState<string | null>(null);

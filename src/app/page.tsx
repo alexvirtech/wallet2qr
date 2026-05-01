@@ -21,7 +21,7 @@ import OfflineModeBanner from "@/components/OfflineModeBanner";
 type DeepLinkMode = "mnemonic" | "wallet2qr" | "extrasafe" | "tinywallet";
 
 const EXTRASAFE_URL = "https://www.extrasafe.online";
-const TINYWALLET_URL = "https://tiny-wallet.com";
+const TINYWALLET_URL = "https://www.tiny-wallet.com";
 
 function DeepLinkHandler() {
   const searchParams = useSearchParams();
