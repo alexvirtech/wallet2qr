@@ -375,7 +375,7 @@ function DeepLinkHandler() {
             <button
               onClick={() => handleDecrypt("mnemonic")}
               disabled={!canDecrypt}
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
+              className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
             >
               {decrypting ? "Decrypting..." : "Mnemonic"}
             </button>

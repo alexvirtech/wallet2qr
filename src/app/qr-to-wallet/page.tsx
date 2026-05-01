@@ -421,7 +421,7 @@ export default function QrToWalletPage() {
               <button
                 onClick={() => handleDecrypt("mnemonic")}
                 disabled={decrypting}
-                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
+                className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
               >
                 {decrypting ? "Decrypting..." : "Mnemonic"}
               </button>
