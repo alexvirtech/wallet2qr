@@ -170,7 +170,7 @@ export default function QrToWalletPage() {
           setSession(decrypted, password, readOnly);
           router.push("/wallet");
         } else if (mode === "extrasafe") {
-          window.location.replace(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`);
+          window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`, '_blank');
         } else {
           setRevealedMnemonic(decrypted);
           setDecrypting(false);
@@ -238,7 +238,7 @@ export default function QrToWalletPage() {
         setSession(mnemonic, password, readOnly, isDet);
         router.push("/wallet");
       } else if (mode === "extrasafe") {
-        window.location.replace(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`);
+        window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`, '_blank');
       } else {
         setRevealedMnemonic(mnemonic);
         setDecrypting(false);

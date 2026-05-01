@@ -127,7 +127,7 @@ function DeepLinkHandler() {
           setSession(decrypted, pass, readOnly);
           router.push("/wallet");
         } else if (mode === "extrasafe") {
-          window.location.replace(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`);
+          window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`, '_blank');
         } else {
           setRevealedMnemonic(decrypted);
           setDecrypting(false);
@@ -191,7 +191,7 @@ function DeepLinkHandler() {
         setSession(mnemonic, pass, readOnly, isDet);
         router.push("/wallet");
       } else if (mode === "extrasafe") {
-        window.location.replace(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`);
+        window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`, '_blank');
       } else {
         setRevealedMnemonic(mnemonic);
         setDecrypting(false);
