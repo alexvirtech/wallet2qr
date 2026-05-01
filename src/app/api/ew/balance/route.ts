@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       ...(EW_KEY ? { "x-api-key": EW_KEY } : {}),
     },
     body,
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(9_000),
   });
 
   const data = await res.text();

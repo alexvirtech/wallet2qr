@@ -480,11 +480,11 @@ export default function BalanceList({ accounts, hideZero, onTotalChange, isDeter
         items = await refreshDirect(directAccounts, getVisibleTokens);
       } else {
         try {
-          items = await refreshViaExtraWallet(accounts, getVisibleTokens);
+          items = await withTimeout(refreshViaExtraWallet(accounts, getVisibleTokens), FETCH_TIMEOUT);
         } catch {
           if (isProxyEnabled()) {
             try {
-              items = await refreshViaProxy(accounts, getVisibleTokens);
+              items = await withTimeout(refreshViaProxy(accounts, getVisibleTokens), FETCH_TIMEOUT);
             } catch {
               items = await refreshDirect(directAccounts, getVisibleTokens);
             }
