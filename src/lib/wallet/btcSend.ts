@@ -238,17 +238,22 @@ export async function sendBtcWithMemo(
   recipientAddress: string,
   amountSats: number,
   feeRate: number,
-  memo: string
+  memo: string,
+  onStep?: (step: string) => void
 ): Promise<string> {
+  onStep?.("Fetching UTXOs...");
   const utxos = await fetchUtxos(senderAddress);
+
+  onStep?.("Planning transaction...");
   const memoLength = new TextEncoder().encode(memo).length;
   const plan = planTransaction(utxos, amountSats, feeRate, memoLength);
 
+  onStep?.("Building transaction...");
   const privKey = hex.decode(privateKeyHex);
   const pubKey = secp256k1.getPublicKey(privKey, true);
   const payment = btc.p2wpkh(pubKey);
 
-  const tx = new btc.Transaction();
+  const tx = new btc.Transaction({ allowUnknownOutputs: true });
 
   for (const utxo of plan.inputs) {
     tx.addInput({
@@ -268,9 +273,14 @@ export async function sendBtcWithMemo(
     tx.addOutputAddress(senderAddress, BigInt(plan.change));
   }
 
+  onStep?.("Signing transaction...");
   tx.sign(privKey);
   tx.finalize();
 
+  onStep?.("Broadcasting transaction...");
   const rawTx = hex.encode(tx.extract());
-  return broadcastTx(rawTx);
+  const txHash = await broadcastTx(rawTx);
+
+  onStep?.("Transaction broadcast successfully!");
+  return txHash;
 }

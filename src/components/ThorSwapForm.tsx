@@ -99,6 +99,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [executing, setExecuting] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [swapStep, setSwapStep] = useState<string | null>(null);
 
   const fromTokens = useMemo(() => getTokensForNetwork(fromChain), [fromChain]);
   const toTokens = useMemo(() => getTokensForNetwork(toChain), [toChain]);
@@ -193,6 +194,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
     setExecuting(true);
     setError(null);
     setTxHash(null);
+    setSwapStep("Preparing wallet...");
     try {
       const chain = EVM_CHAINS[net.chainId] ?? {
         id: net.chainId,
@@ -206,6 +208,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
 
       let hash: Hex;
       if (!fromToken.address) {
+        setSwapStep("Sending native token to THORChain vault...");
         hash = await client.sendTransaction({
           to: quote.inbound_address as Address,
           value: tokenAmount,
@@ -215,6 +218,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
       } else {
         const router = quote.router as Address;
         if (!router) throw new Error("No router address in quote — cannot execute ERC20 swap");
+        setSwapStep("Approving token spend...");
         await client.writeContract({
           address: fromToken.address as Address,
           abi: erc20Abi,
@@ -222,6 +226,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
           args: [router, tokenAmount],
           chain,
         });
+        setSwapStep("Depositing to THORChain router...");
         hash = await client.writeContract({
           address: router,
           abi: THOR_ROUTER_ABI,
@@ -236,6 +241,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
           chain,
         });
       }
+      setSwapStep("Transaction confirmed!");
       setTxHash(hash);
       logSwap({
         provider: "thorchain",
@@ -254,6 +260,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
       setError(e instanceof Error ? e.message : "Transaction failed");
     } finally {
       setExecuting(false);
+      setSwapStep(null);
     }
   }, [quote, isEvmSource, fromChain, toChain, privateKeys, amount, fromToken, toToken]);
 
@@ -266,6 +273,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
     setExecuting(true);
     setError(null);
     setTxHash(null);
+    setSwapStep("Starting BTC swap...");
     try {
       const amountSats = Math.round(parseFloat(amount) * 1e8);
       const feeRate = parseInt(quote.recommended_gas_rate) || 10;
@@ -275,8 +283,10 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
         quote.inbound_address,
         amountSats,
         feeRate,
-        quote.memo
+        quote.memo,
+        setSwapStep
       );
+      setSwapStep("Transaction confirmed!");
       setTxHash(hash);
       logSwap({
         provider: "thorchain",
@@ -295,6 +305,7 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
       setError(e instanceof Error ? e.message : "Transaction failed");
     } finally {
       setExecuting(false);
+      setSwapStep(null);
     }
   }, [quote, isEvmSource, addresses, privateKeys, amount, fromChain, toChain, fromToken, toToken]);
 
@@ -432,6 +443,9 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
               >
                 {executing ? "Executing Swap..." : "Execute Swap"}
               </button>
+              {swapStep && (
+                <p className="text-xs text-blue-500 dark:text-blue-400 mt-2 text-center font-medium animate-pulse">{swapStep}</p>
+              )}
               <p className="text-[10px] text-gray-400 mt-2 text-center">
                 Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}
               </p>
@@ -447,6 +461,9 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
               >
                 {executing ? "Executing Swap..." : "Execute Swap"}
               </button>
+              {swapStep && (
+                <p className="text-xs text-blue-500 dark:text-blue-400 mt-1 text-center font-medium animate-pulse">{swapStep}</p>
+              )}
               <p className="text-[10px] text-gray-400 text-center">
                 Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}
               </p>
