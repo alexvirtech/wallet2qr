@@ -18,7 +18,9 @@ import type { Step } from "@/components/StepIndicator";
 import SecurityStatusPanel from "@/components/SecurityStatusPanel";
 import OfflineModeBanner from "@/components/OfflineModeBanner";
 
-type DeepLinkMode = "wallet" | "mnemonic";
+type DeepLinkMode = "mnemonic" | "wallet2qr" | "extrasafe";
+
+const EXTRASAFE_URL = "https://www.extrasafe.online";
 
 function DeepLinkHandler() {
   const searchParams = useSearchParams();
@@ -121,9 +123,11 @@ function DeepLinkHandler() {
           return;
         }
 
-        if (mode === "wallet") {
+        if (mode === "wallet2qr") {
           setSession(decrypted, pass, readOnly);
           router.push("/wallet");
+        } else if (mode === "extrasafe") {
+          window.location.replace(`${EXTRASAFE_URL}/import-wallet?m=${encodeURIComponent(decrypted)}`);
         } else {
           setRevealedMnemonic(decrypted);
           setDecrypting(false);
@@ -183,9 +187,11 @@ function DeepLinkHandler() {
         }
       }
 
-      if (mode === "wallet") {
+      if (mode === "wallet2qr") {
         setSession(mnemonic, pass, readOnly, isDet);
         router.push("/wallet");
+      } else if (mode === "extrasafe") {
+        window.location.replace(`${EXTRASAFE_URL}/import-wallet?m=${encodeURIComponent(mnemonic)}`);
       } else {
         setRevealedMnemonic(mnemonic);
         setDecrypting(false);
@@ -355,7 +361,7 @@ function DeepLinkHandler() {
           <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
             After decryption
           </p>
-          <div className="flex gap-4">
+          <div className="flex flex-col gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="radio"
@@ -370,23 +376,22 @@ function DeepLinkHandler() {
               <input
                 type="radio"
                 name="dl-mode"
-                checked={mode === "wallet"}
-                onChange={() => setMode("wallet")}
+                checked={mode === "wallet2qr"}
+                onChange={() => setMode("wallet2qr")}
                 className="accent-blue-500"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Open Wallet</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Open in Wallet2QR</span>
             </label>
-            {mode === "wallet" && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={readOnly}
-                  onChange={(e) => setReadOnly(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
-                <span className="text-sm text-gray-600 dark:text-gray-300">Read-only</span>
-              </label>
-            )}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="dl-mode"
+                checked={mode === "extrasafe"}
+                onChange={() => setMode("extrasafe")}
+                className="accent-blue-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">Open in ExtraSafe</span>
+            </label>
           </div>
         </div>
 
