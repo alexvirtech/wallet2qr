@@ -79,3 +79,43 @@ export function decodeQrFromImageData(
   const qrCode = jsQR(data, width, height);
   return qrCode?.data ?? null;
 }
+
+// Enhanced decode from raw ImageData — tries center whiteout and binarization
+// for old QR codes with embedded logos. More expensive than single-pass.
+export function decodeQrFromImageDataEnhanced(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number
+): string | null {
+  // Attempt 1: direct
+  let qr = jsQR(data, width, height);
+  if (qr?.data) return qr.data;
+
+  // Attempt 2: white out center logo area (28% of smallest dimension)
+  const copy = new Uint8ClampedArray(data);
+  const logoSize = Math.min(width, height) * 0.28;
+  const lx = Math.floor((width - logoSize) / 2);
+  const ly = Math.floor((height - logoSize) / 2);
+  const lw = Math.ceil(logoSize);
+  const lh = Math.ceil(logoSize);
+  for (let y = ly; y < ly + lh && y < height; y++) {
+    for (let x = lx; x < lx + lw && x < width; x++) {
+      const i = (y * width + x) * 4;
+      copy[i] = copy[i + 1] = copy[i + 2] = 255;
+    }
+  }
+  qr = jsQR(copy, width, height);
+  if (qr?.data) return qr.data;
+
+  // Attempt 3: binarize to reduce noise
+  const bin = new Uint8ClampedArray(data);
+  for (let i = 0; i < bin.length; i += 4) {
+    const lum = bin[i] * 0.299 + bin[i + 1] * 0.587 + bin[i + 2] * 0.114;
+    const v = lum < 128 ? 0 : 255;
+    bin[i] = bin[i + 1] = bin[i + 2] = v;
+  }
+  qr = jsQR(bin, width, height);
+  if (qr?.data) return qr.data;
+
+  return null;
+}

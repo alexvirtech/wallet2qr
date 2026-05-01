@@ -132,7 +132,11 @@ export default function WalletPage() {
       {/* Total balance */}
       <div className="h-10 mb-4 flex items-center justify-between">
         <span className="text-2xl font-bold">
-          {totalUsd > 0 ? `$${totalUsd.toFixed(2)}` : "$0.00"}
+          {totalUsd > 0
+            ? totalUsd >= 1e9 ? `$${(totalUsd / 1e9).toFixed(2)}B`
+              : totalUsd >= 1e6 ? `$${(totalUsd / 1e6).toFixed(2)}M`
+              : `$${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            : "$0.00"}
         </span>
         <label className="flex items-center gap-2 cursor-pointer">
           <span className="text-xs text-gray-400">Non-zero</span>

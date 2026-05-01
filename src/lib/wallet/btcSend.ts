@@ -44,18 +44,24 @@ async function fetchUtxos(address: string): Promise<Utxo[]> {
   return res.json();
 }
 
-function estimateTxSize(inputCount: number, outputCount: number): number {
+function estimateTxSize(inputCount: number, outputCount: number, memoLength = 0): number {
   // P2WPKH: ~10.5 vbytes overhead + 68 vbytes per input + 31 vbytes per output
-  return Math.ceil(10.5 + inputCount * 68 + outputCount * 31);
+  let size = Math.ceil(10.5 + inputCount * 68 + outputCount * 31);
+  if (memoLength > 0) {
+    // OP_RETURN output: 8 (value) + 1 (script len) + 1 (OP_RETURN) + push op + data
+    size += 8 + 1 + 1 + (memoLength <= 75 ? 1 : 2) + memoLength;
+  }
+  return size;
 }
 
 export function estimateFee(
   utxoCount: number,
   feeRate: number,
-  hasChange: boolean
+  hasChange: boolean,
+  memoLength = 0
 ): number {
   const outputs = hasChange ? 2 : 1;
-  return estimateTxSize(utxoCount, outputs) * feeRate;
+  return estimateTxSize(utxoCount, outputs, memoLength) * feeRate;
 }
 
 export interface BtcTxPlan {
@@ -69,7 +75,8 @@ export interface BtcTxPlan {
 export function planTransaction(
   utxos: Utxo[],
   amountSats: number,
-  feeRate: number
+  feeRate: number,
+  memoLength = 0
 ): BtcTxPlan {
   const sorted = [...utxos]
     .filter((u) => u.status.confirmed)
@@ -84,8 +91,8 @@ export function planTransaction(
     selected.push(utxo);
     total += utxo.value;
 
-    const feeNoChange = estimateFee(selected.length, feeRate, false);
-    const feeWithChange = estimateFee(selected.length, feeRate, true);
+    const feeNoChange = estimateFee(selected.length, feeRate, false, memoLength);
+    const feeWithChange = estimateFee(selected.length, feeRate, true, memoLength);
 
     if (total >= amountSats + feeWithChange) {
       const change = total - amountSats - feeWithChange;
@@ -120,7 +127,7 @@ export function planTransaction(
   }
 
   throw new Error(
-    `Insufficient funds: have ${total} sats, need ${amountSats + estimateFee(sorted.length, feeRate, false)} sats`
+    `Insufficient funds: have ${total} sats, need ${amountSats + estimateFee(sorted.length, feeRate, false, memoLength)} sats`
   );
 }
 
@@ -207,5 +214,63 @@ export async function sendBtc(
     recipientAddress,
     plan
   );
+  return broadcastTx(rawTx);
+}
+
+function buildOpReturnScript(memo: string): Uint8Array {
+  const data = new TextEncoder().encode(memo);
+  if (data.length > 80) throw new Error("OP_RETURN memo too long (max 80 bytes)");
+  const parts: number[] = [0x6a]; // OP_RETURN
+  if (data.length <= 75) {
+    parts.push(data.length);
+  } else {
+    parts.push(0x4c, data.length); // OP_PUSHDATA1
+  }
+  const script = new Uint8Array(parts.length + data.length);
+  script.set(parts);
+  script.set(data, parts.length);
+  return script;
+}
+
+export async function sendBtcWithMemo(
+  privateKeyHex: string,
+  senderAddress: string,
+  recipientAddress: string,
+  amountSats: number,
+  feeRate: number,
+  memo: string
+): Promise<string> {
+  const utxos = await fetchUtxos(senderAddress);
+  const memoLength = new TextEncoder().encode(memo).length;
+  const plan = planTransaction(utxos, amountSats, feeRate, memoLength);
+
+  const privKey = hex.decode(privateKeyHex);
+  const pubKey = secp256k1.getPublicKey(privKey, true);
+  const payment = btc.p2wpkh(pubKey);
+
+  const tx = new btc.Transaction();
+
+  for (const utxo of plan.inputs) {
+    tx.addInput({
+      txid: utxo.txid,
+      index: utxo.vout,
+      witnessUtxo: {
+        script: payment.script,
+        amount: BigInt(utxo.value),
+      },
+    });
+  }
+
+  tx.addOutputAddress(recipientAddress, BigInt(plan.sendAmount));
+  tx.addOutput({ script: buildOpReturnScript(memo), amount: BigInt(0) });
+
+  if (plan.change > 0) {
+    tx.addOutputAddress(senderAddress, BigInt(plan.change));
+  }
+
+  tx.sign(privKey);
+  tx.finalize();
+
+  const rawTx = hex.encode(tx.extract());
   return broadcastTx(rawTx);
 }

@@ -4,6 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import {
   decodeQrFromImage,
   decodeQrFromImageData,
+  decodeQrFromImageDataEnhanced,
 } from "@/lib/compat/qrDecoder";
 
 interface QrScannerProps {
@@ -94,6 +95,7 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
       const canvas = canvasRef.current!;
       const ctx = canvas.getContext("2d")!;
 
+      let frameCount = 0;
       const scan = () => {
         if (!streamRef.current) return;
         if (video.videoWidth > 0 && video.videoHeight > 0) {
@@ -101,16 +103,16 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const qrData = decodeQrFromImageData(
-            imageData.data,
-            canvas.width,
-            canvas.height
-          );
+          // Fast single-pass every frame; enhanced decode every ~15 frames (~500ms)
+          const qrData = frameCount % 15 === 0
+            ? decodeQrFromImageDataEnhanced(imageData.data, canvas.width, canvas.height)
+            : decodeQrFromImageData(imageData.data, canvas.width, canvas.height);
           if (qrData) {
             stopCamera();
             onDecoded(qrData);
             return;
           }
+          frameCount++;
         }
         rafRef.current = requestAnimationFrame(scan);
       };

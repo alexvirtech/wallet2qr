@@ -16,6 +16,7 @@ import { mainnet, avalanche, bsc } from "viem/chains";
 import { allNetworks } from "@/lib/wallet/networks";
 import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
 import { getBtcBalance } from "@/lib/wallet/bitcoin";
+import { sendBtcWithMemo } from "@/lib/wallet/btcSend";
 import { fetchPrices } from "@/lib/wallet/prices";
 import {
   fetchThorQuote,
@@ -256,6 +257,47 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
     }
   }, [quote, isEvmSource, fromChain, toChain, privateKeys, amount, fromToken, toToken]);
 
+  const handleExecuteBtc = useCallback(async () => {
+    if (!quote || isEvmSource) return;
+    const addr = addresses[fromChain];
+    const pk = privateKeys[fromChain];
+    if (!addr || !pk) return;
+
+    setExecuting(true);
+    setError(null);
+    setTxHash(null);
+    try {
+      const amountSats = Math.round(parseFloat(amount) * 1e8);
+      const feeRate = parseInt(quote.recommended_gas_rate) || 10;
+      const hash = await sendBtcWithMemo(
+        pk,
+        addr,
+        quote.inbound_address,
+        amountSats,
+        feeRate,
+        quote.memo
+      );
+      setTxHash(hash);
+      logSwap({
+        provider: "thorchain",
+        fromChain,
+        toChain,
+        fromToken: fromToken.symbol,
+        toToken: toToken.symbol,
+        fromAmount: amount,
+        toAmount: quote.expected_amount_out ? thorAmountToHuman(quote.expected_amount_out, toToken.decimals) : "",
+        txHash: hash,
+        status: "pending",
+        feeBps: Number(THORCHAIN_AFFILIATE_BPS),
+        feeAmount: quote.fees?.total ? thorAmountToHuman(quote.fees.total, toToken.decimals) : "",
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Transaction failed");
+    } finally {
+      setExecuting(false);
+    }
+  }, [quote, isEvmSource, addresses, privateKeys, amount, fromChain, toChain, fromToken, toToken]);
+
   const copyText = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
@@ -396,46 +438,54 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
             </div>
           )}
 
-          {!isEvmSource && (
+          {!isEvmSource && !txHash && (
             <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3 space-y-3">
-              <p className="text-xs font-bold text-gray-600 dark:text-gray-300">
-                Send {amount} {fromToken.symbol} to this address:
+              <button
+                onClick={handleExecuteBtc}
+                disabled={executing}
+                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {executing ? "Executing Swap..." : "Execute Swap"}
+              </button>
+              <p className="text-[10px] text-gray-400 text-center">
+                Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}
               </p>
-              <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-xs break-all">{quote.inbound_address}</p>
-                  <button
-                    onClick={() => copyText(quote.inbound_address, "addr")}
-                    className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
-                  >
-                    {copiedField === "addr" ? "Copied" : "Copy"}
-                  </button>
-                </div>
-              </div>
 
-              <div>
-                <p className="text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">
-                  With memo:
-                </p>
-                <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-mono text-xs break-all">{quote.memo}</p>
-                    <button
-                      onClick={() => copyText(quote.memo, "memo")}
-                      className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
-                    >
-                      {copiedField === "memo" ? "Copied" : "Copy"}
-                    </button>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                  Manual send details
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <p className="font-bold text-gray-600 dark:text-gray-300">
+                    Vault address:
+                  </p>
+                  <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-xs break-all">{quote.inbound_address}</p>
+                      <button
+                        onClick={() => copyText(quote.inbound_address, "addr")}
+                        className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
+                      >
+                        {copiedField === "addr" ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="font-bold text-gray-600 dark:text-gray-300">
+                    Memo (OP_RETURN):
+                  </p>
+                  <div className="bg-gray-50 dark:bg-m-blue-dark-3 rounded p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-mono text-xs break-all">{quote.memo}</p>
+                      <button
+                        onClick={() => copyText(quote.memo, "memo")}
+                        className="text-[10px] text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
+                      >
+                        {copiedField === "memo" ? "Copied" : "Copy"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded p-2">
-                <p className="text-[10px] text-yellow-700 dark:text-yellow-300">
-                  The memo is required for the swap to be processed. Send from a wallet that supports OP_RETURN (BTC) or
-                  transaction memos. Quote expires at {new Date(quote.expiry * 1000).toLocaleTimeString()}.
-                </p>
-              </div>
+              </details>
             </div>
           )}
         </div>

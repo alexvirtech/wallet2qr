@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const THORNODES = [
   "https://thornode.thorchain.liquify.com/thorchain/quote/swap",
   "https://thornode.ninerealms.com/thorchain/quote/swap",
+  "https://thornode-v2.ninerealms.com/thorchain/quote/swap",
 ];
 
 export async function GET(req: NextRequest) {

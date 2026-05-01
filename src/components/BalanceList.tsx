@@ -239,7 +239,7 @@ async function refreshViaExtraWallet(
     fetchPrices(),
   ]);
 
-  const balanceMap = new Map<string, { balance: string; price: number; usd: number }>();
+  const balanceMap = new Map<string, { balance: string }>();
   for (const item of ewRes) {
     const nk = EW_BLOCKCHAIN_TO_KEY[item.blockchain];
     if (!nk) continue;
@@ -248,8 +248,6 @@ async function refreshViaExtraWallet(
       : `${nk}:NATIVE`;
     balanceMap.set(key, {
       balance: item.balance ?? "0",
-      price: parseFloat(item.tokenPrice ?? "0"),
-      usd: parseFloat(item.balanceUsd ?? "0"),
     });
   }
 
@@ -267,7 +265,7 @@ async function refreshViaExtraWallet(
       if (isSupported) {
         const entry = balanceMap.get(`${networkKey}:NATIVE`);
         raw = entry ? parseFloat(entry.balance) : 0;
-        usd = entry?.usd ?? raw * (prices[network.nativeCurrency.symbol] ?? 0);
+        usd = raw * (prices[network.nativeCurrency.symbol] ?? 0);
         balStr = entry?.balance ?? "0";
       } else {
         try {
@@ -300,7 +298,7 @@ async function refreshViaExtraWallet(
       if (!visibleSymbols.includes(token.symbol)) continue;
       const entry = balanceMap.get(`${networkKey}:${token.address.toLowerCase()}`);
       const raw = entry ? parseFloat(entry.balance) : 0;
-      const usd = entry?.usd ?? raw * (prices[token.symbol] ?? 0);
+      const usd = raw * (prices[token.symbol] ?? 0);
       const def = assetDefs.find((a) => a.symbol === token.symbol);
       items.push({
         symbol: token.symbol,
@@ -804,7 +802,9 @@ function formatBalance(val: string, decimals = 4): string {
 }
 
 function formatUsd(val: number): string {
-  if (isNaN(val) || val === 0) return "$0.00";
+  if (isNaN(val) || !isFinite(val) || val === 0) return "$0.00";
   if (val < 0.01) return "<$0.01";
-  return `$${val.toFixed(2)}`;
+  if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`;
+  if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`;
+  return `$${val.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
