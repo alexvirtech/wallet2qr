@@ -119,11 +119,12 @@ const CATEGORY_LABELS: Record<AssetCategory, string> = {
   ecosystem: "Eco",
 };
 
-const LS_BALANCES_KEY = "w2q_balances";
+const LS_BALANCES_KEY = "w2q_balances_v2";
 const REFRESH_INTERVAL = 60_000;
 
 function loadCachedBalances(): Record<string, BalanceItem[]> {
   try {
+    localStorage.removeItem("w2q_balances");
     const raw = localStorage.getItem(LS_BALANCES_KEY);
     if (!raw) return {};
     return JSON.parse(raw);
@@ -537,7 +538,10 @@ export default function BalanceList({ accounts, hideZero, onTotalChange, isDeter
   }, [refresh, isDeterministic]);
 
   const filtered = hideZero ? balances.filter((b) => b.rawBalance > 0) : balances;
-  const totalUsd = balances.reduce((sum, b) => sum + (isNaN(b.usdNum) ? 0 : b.usdNum), 0);
+  const totalUsd = balances.reduce((sum, b) => {
+    const v = b.usdNum;
+    return sum + (isNaN(v) || !isFinite(v) || v > 1e12 ? 0 : v);
+  }, 0);
   const isMultiNetwork = accounts.length > 1;
 
   useEffect(() => {
