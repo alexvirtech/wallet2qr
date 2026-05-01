@@ -18,9 +18,10 @@ import type { Step } from "@/components/StepIndicator";
 import SecurityStatusPanel from "@/components/SecurityStatusPanel";
 import OfflineModeBanner from "@/components/OfflineModeBanner";
 
-type DeepLinkMode = "mnemonic" | "wallet2qr" | "extrasafe";
+type DeepLinkMode = "mnemonic" | "wallet2qr" | "extrasafe" | "tinywallet";
 
 const EXTRASAFE_URL = "https://www.extrasafe.online";
+const TINYWALLET_URL = "https://tiny-wallet.com";
 
 function DeepLinkHandler() {
   const searchParams = useSearchParams();
@@ -128,6 +129,9 @@ function DeepLinkHandler() {
         } else if (targetMode === "extrasafe") {
           window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`, '_blank');
           setDecrypting(false);
+        } else if (targetMode === "tinywallet") {
+          window.open(`${TINYWALLET_URL}/?m=${encodeURIComponent(decrypted)}`, '_blank');
+          setDecrypting(false);
         } else {
           setRevealedMnemonic(decrypted);
           setDecrypting(false);
@@ -192,6 +196,9 @@ function DeepLinkHandler() {
         router.push("/wallet");
       } else if (targetMode === "extrasafe") {
         window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`, '_blank');
+        setDecrypting(false);
+      } else if (targetMode === "tinywallet") {
+        window.open(`${TINYWALLET_URL}/?m=${encodeURIComponent(mnemonic)}`, '_blank');
         setDecrypting(false);
       } else {
         setRevealedMnemonic(mnemonic);
@@ -385,6 +392,13 @@ function DeepLinkHandler() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
             >
               ExtraSafe
+            </button>
+            <button
+              onClick={() => handleDecrypt("tinywallet")}
+              disabled={!canDecrypt}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
+            >
+              TinyWallet
             </button>
           </div>
         </div>

@@ -31,9 +31,10 @@ function computeSubHash(sub: string): string {
     .replace(/=+$/, "");
 }
 
-type Mode = "mnemonic" | "wallet2qr" | "extrasafe";
+type Mode = "mnemonic" | "wallet2qr" | "extrasafe" | "tinywallet";
 
 const EXTRASAFE_URL = "https://www.extrasafe.online";
+const TINYWALLET_URL = "https://tiny-wallet.com";
 
 export default function QrToWalletPage() {
   const [rawQrUrl, setRawQrUrl] = useState<string | null>(null);
@@ -171,6 +172,9 @@ export default function QrToWalletPage() {
         } else if (targetMode === "extrasafe") {
           window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`, '_blank');
           setDecrypting(false);
+        } else if (targetMode === "tinywallet") {
+          window.open(`${TINYWALLET_URL}/?m=${encodeURIComponent(decrypted)}`, '_blank');
+          setDecrypting(false);
         } else {
           setRevealedMnemonic(decrypted);
           setDecrypting(false);
@@ -239,6 +243,9 @@ export default function QrToWalletPage() {
         router.push("/wallet");
       } else if (targetMode === "extrasafe") {
         window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`, '_blank');
+        setDecrypting(false);
+      } else if (targetMode === "tinywallet") {
+        window.open(`${TINYWALLET_URL}/?m=${encodeURIComponent(mnemonic)}`, '_blank');
         setDecrypting(false);
       } else {
         setRevealedMnemonic(mnemonic);
@@ -431,6 +438,13 @@ export default function QrToWalletPage() {
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
               >
                 ExtraSafe
+              </button>
+              <button
+                onClick={() => handleDecrypt("tinywallet")}
+                disabled={decrypting}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-1.5 px-4 rounded-md text-sm disabled:opacity-50"
+              >
+                TinyWallet
               </button>
               <button
                 onClick={handleReset}
