@@ -52,7 +52,6 @@ function DeepLinkHandler() {
   const [autoAttempted, setAutoAttempted] = useState(false);
   const [readOnly, setReadOnly] = useState(roParam === "1");
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const [mode, setMode] = useState<DeepLinkMode>("mnemonic");
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
 
   const sessionProvider = authSession?.provider ?? null;
@@ -74,7 +73,7 @@ function DeepLinkHandler() {
     }
   }, [selectedProvider, isSignedIn, sessionProvider]);
 
-  const handleDecrypt = useCallback(async (pwd?: string) => {
+  const handleDecrypt = useCallback(async (targetMode: DeepLinkMode, pwd?: string) => {
     const pass = pwd ?? password;
     if (!ds || !pass) {
       setError("Enter your password to decrypt.");
@@ -123,11 +122,12 @@ function DeepLinkHandler() {
           return;
         }
 
-        if (mode === "wallet2qr") {
+        if (targetMode === "wallet2qr") {
           setSession(decrypted, pass, readOnly);
           router.push("/wallet");
-        } else if (mode === "extrasafe") {
+        } else if (targetMode === "extrasafe") {
           window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(decrypted)}`, '_blank');
+          setDecrypting(false);
         } else {
           setRevealedMnemonic(decrypted);
           setDecrypting(false);
@@ -187,11 +187,12 @@ function DeepLinkHandler() {
         }
       }
 
-      if (mode === "wallet2qr") {
+      if (targetMode === "wallet2qr") {
         setSession(mnemonic, pass, readOnly, isDet);
         router.push("/wallet");
-      } else if (mode === "extrasafe") {
+      } else if (targetMode === "extrasafe") {
         window.open(`${EXTRASAFE_URL}/#/import-wallet?m=${encodeURIComponent(mnemonic)}`, '_blank');
+        setDecrypting(false);
       } else {
         setRevealedMnemonic(mnemonic);
         setDecrypting(false);
@@ -200,12 +201,12 @@ function DeepLinkHandler() {
       setError(err instanceof Error ? err.message : "Decryption failed");
       setDecrypting(false);
     }
-  }, [ds, password, readOnly, mode, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, usesSocialFactor, selectedProvider, provider, w1, w2, setSession, router]);
+  }, [ds, password, readOnly, isV2, isV3, isSignedIn, salt, encMode, providerSub, backupCode, v3NeedsAccount, v3NeedsBackup, usesSocialFactor, selectedProvider, provider, w1, w2, setSession, router]);
 
   useEffect(() => {
     if (ds && pw && !autoAttempted && !isV2 && !isV3) {
       setAutoAttempted(true);
-      handleDecrypt(pw);
+      handleDecrypt("mnemonic", pw);
     }
   }, [ds, pw, autoAttempted, isV2, isV3, handleDecrypt]);
 
@@ -304,7 +305,7 @@ function DeepLinkHandler() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password to decrypt"
             className="mt-1 px-3 py-2 border border-gray-300 rounded-lg w-full dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300"
-            onKeyDown={(e) => { if (e.key === "Enter" && canDecrypt) handleDecrypt(); }}
+            onKeyDown={(e) => { if (e.key === "Enter" && canDecrypt) handleDecrypt("mnemonic"); }}
             autoFocus
           />
         </div>
@@ -356,54 +357,37 @@ function DeepLinkHandler() {
           </div>
         )}
 
-        {/* Mode selection */}
-        <div className="space-y-2">
-          <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
-            After decryption
-          </p>
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="dl-mode"
-                checked={mode === "mnemonic"}
-                onChange={() => setMode("mnemonic")}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">View Mnemonic</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="dl-mode"
-                checked={mode === "wallet2qr"}
-                onChange={() => setMode("wallet2qr")}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Open in Wallet2QR</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="dl-mode"
-                checked={mode === "extrasafe"}
-                onChange={() => setMode("extrasafe")}
-                className="accent-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Open in ExtraSafe</span>
-            </label>
-          </div>
-        </div>
-
         {error && <p className="text-m-red text-sm">{error}</p>}
 
-        <button
-          onClick={() => handleDecrypt()}
-          disabled={!canDecrypt}
-          className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-sm disabled:opacity-50"
-        >
-          {decrypting ? "Decrypting..." : "Decrypt"}
-        </button>
+        {/* Decryption actions */}
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-gray-600 dark:text-m-gray-light-1">
+            Decryption
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => handleDecrypt("mnemonic")}
+              disabled={!canDecrypt}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
+            >
+              {decrypting ? "Decrypting..." : "Mnemonic"}
+            </button>
+            <button
+              onClick={() => handleDecrypt("wallet2qr")}
+              disabled={!canDecrypt}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
+            >
+              Wallet2QR
+            </button>
+            <button
+              onClick={() => handleDecrypt("extrasafe")}
+              disabled={!canDecrypt}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-sm disabled:opacity-50"
+            >
+              ExtraSafe
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Security indicators */}
