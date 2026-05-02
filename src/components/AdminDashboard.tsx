@@ -41,16 +41,18 @@ export default function AdminDashboard({ lifiSwaps }: Props) {
   }, []);
 
   const thorCount = thorSwaps.length;
+  const thorOnChain = thorSwaps.filter((s) => s.source === "midgard").length;
   const thorFeeTotal = thorSwaps.reduce((sum, s) => sum + s.affiliateFeeBps, 0);
   const thorAvgFee = thorCount > 0 ? (thorFeeTotal / thorCount).toFixed(0) : "0";
 
   const lifiCount = lifiSwaps.length;
   const lifiTotalUsd = lifiSwaps.reduce((sum, s) => sum + parseFloat(s.fromAmountUsd || "0"), 0);
+  const lifiIntegrator = "wallet2qr";
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard label="THORChain Swaps" value={String(thorCount)} />
+        <StatCard label="THORChain Swaps" value={`${thorCount} (${thorOnChain} on-chain)`} />
         <StatCard label="Avg Affiliate Fee" value={`${thorAvgFee} bps`} />
         <StatCard label="LI.FI Swaps" value={String(lifiCount)} />
         <StatCard
@@ -96,62 +98,96 @@ export default function AdminDashboard({ lifiSwaps }: Props) {
               </p>
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-200 dark:border-gray-700">
-                  <th className="py-2 pr-4">Date</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">From</th>
-                  <th className="py-2 pr-4">To</th>
-                  <th className="py-2 pr-4">Aff. Fee</th>
-                  <th className="py-2 pr-4">Liq. Fee</th>
-                  <th className="py-2">Tx</th>
-                </tr>
-              </thead>
-              <tbody>
-                {thorSwaps.map((s, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                  >
-                    <td className="py-2 pr-4 whitespace-nowrap">{formatDate(s.date)}</td>
-                    <td className="py-2 pr-4">
-                      <span
-                        className={`text-xs font-bold px-1.5 py-0.5 rounded ${
-                          s.status === "success"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                        }`}
-                      >
-                        {s.status}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-4 font-mono text-xs">
-                      {s.fromAmount} {assetLabel(s.fromAsset)}
-                    </td>
-                    <td className="py-2 pr-4 font-mono text-xs">
-                      {s.toAmount} {assetLabel(s.toAsset)}
-                    </td>
-                    <td className="py-2 pr-4">{s.affiliateFeeBps} bps</td>
-                    <td className="py-2 pr-4 font-mono text-xs">{s.liquidityFee}</td>
-                    <td className="py-2 font-mono text-xs">
-                      {s.inTxHash ? (
-                        <a
-                          href={`https://viewblock.io/thorchain/tx/${s.inTxHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:text-blue-700"
-                        >
-                          {shortenHash(s.inTxHash)}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                    <th className="py-2 pr-4">Date</th>
+                    <th className="py-2 pr-4">Source</th>
+                    <th className="py-2 pr-4">Status</th>
+                    <th className="py-2 pr-4">From</th>
+                    <th className="py-2 pr-4">To</th>
+                    <th className="py-2 pr-4">Aff. Fee</th>
+                    <th className="py-2">Tx</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {thorSwaps.map((s, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    >
+                      <td className="py-2 pr-4 whitespace-nowrap">{formatDate(s.date)}</td>
+                      <td className="py-2 pr-4">
+                        <span
+                          className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                            s.source === "midgard"
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                              : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                          }`}
+                        >
+                          {s.source === "midgard" ? "on-chain" : "app-log"}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4">
+                        <span
+                          className={`text-xs font-bold px-1.5 py-0.5 rounded ${
+                            s.status === "success"
+                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 font-mono text-xs">
+                        {s.fromAmount} {assetLabel(s.fromAsset)}
+                      </td>
+                      <td className="py-2 pr-4 font-mono text-xs">
+                        {s.toAmount} {assetLabel(s.toAsset)}
+                      </td>
+                      <td className="py-2 pr-4">{s.affiliateFeeBps} bps</td>
+                      <td className="py-2 font-mono text-xs">
+                        {s.inTxHash ? (
+                          <a
+                            href={`https://viewblock.io/thorchain/tx/${s.inTxHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:text-blue-700"
+                          >
+                            {shortenHash(s.inTxHash)}
+                          </a>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 text-xs">
+                {thorAffiliate && (
+                  <a
+                    href={`https://gateway.liquify.com/chain/thorchain_midgard/v2/actions?address=${thorAffiliate}&type=swap&limit=50`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 underline"
+                  >
+                    Midgard API (raw JSON)
+                  </a>
+                )}
+                {thorAffiliate && (
+                  <a
+                    href={`https://viewblock.io/thorchain/address/${thorAffiliate}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:text-blue-700 underline"
+                  >
+                    ViewBlock Explorer
+                  </a>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -224,6 +260,16 @@ export default function AdminDashboard({ lifiSwaps }: Props) {
               </tbody>
             </table>
           )}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-3 text-xs">
+            <a
+              href={`https://li.quest/v1/analytics/transfers?integrator=${lifiIntegrator}&limit=100`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:text-blue-700 underline"
+            >
+              LI.FI Analytics API (raw JSON)
+            </a>
+          </div>
         </div>
       )}
     </div>

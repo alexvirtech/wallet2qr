@@ -11,6 +11,7 @@ export interface ThorSwapRow {
   liquidityFee: string;
   inTxHash: string;
   outTxHash: string;
+  source?: "midgard" | "app-log";
 }
 
 export interface LifiSwapRow {
