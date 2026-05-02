@@ -169,14 +169,29 @@ export default function ThorSwapForm({ addresses, privateKeys }: ThorSwapFormPro
     setLoading(true);
     try {
       const thorAmount = humanToThorAmount(amount, fromToken.decimals);
-      const result = await fetchThorQuote({
+      const quoteParams = {
         fromAsset,
         toAsset,
         amount: thorAmount,
         destination,
         affiliate: THORCHAIN_AFFILIATE || undefined,
         affiliateBps: THORCHAIN_AFFILIATE ? THORCHAIN_AFFILIATE_BPS : undefined,
-      });
+      };
+      let result: ThorQuoteResponse;
+      try {
+        result = await fetchThorQuote(quoteParams);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        if (msg.includes("memo too long") && quoteParams.affiliate) {
+          result = await fetchThorQuote({
+            ...quoteParams,
+            affiliate: undefined,
+            affiliateBps: undefined,
+          });
+        } else {
+          throw e;
+        }
+      }
       setQuote(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to get quote");
