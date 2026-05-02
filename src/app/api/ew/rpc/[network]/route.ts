@@ -18,11 +18,15 @@ export async function POST(
     },
     body,
     signal: AbortSignal.timeout(15_000),
+    cache: "no-store",
   });
 
   const data = await res.text();
   return new NextResponse(data, {
     status: res.status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
   });
 }

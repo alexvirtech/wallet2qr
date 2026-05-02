@@ -15,12 +15,16 @@ export async function POST(req: NextRequest) {
         ...(EW_KEY ? { "x-api-key": EW_KEY } : {}),
       },
       signal: AbortSignal.timeout(30_000),
+      cache: "no-store",
     }
   );
 
   const data = await res.text();
   return new NextResponse(data, {
     status: res.status,
-    headers: { "Content-Type": res.headers.get("Content-Type") || "text/plain" },
+    headers: {
+      "Content-Type": res.headers.get("Content-Type") || "text/plain",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
   });
 }
