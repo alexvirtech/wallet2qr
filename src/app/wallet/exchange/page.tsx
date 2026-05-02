@@ -7,13 +7,13 @@ import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveAccount } from "@/lib/wallet/derive";
 import { getNetwork, allNetworks } from "@/lib/wallet/networks";
-import { getThorSupportedNetworks } from "@/lib/thorchain/api";
+import { getChainflipSupportedNetworks } from "@/lib/chainflip/api";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import ExchangeForm from "@/components/ExchangeForm";
-import ThorSwapForm from "@/components/ThorSwapForm";
+import ChainflipSwapForm from "@/components/ChainflipSwapForm";
 import type { Hex, Address } from "viem";
 
-type SwapProvider = "lifi" | "thorchain";
+type SwapProvider = "lifi" | "chainflip";
 
 export default function ExchangePage() {
   const { mnemonic, isUnlocked, readOnly } = useSession();
@@ -24,7 +24,7 @@ export default function ExchangePage() {
     (k) => getNetwork(k).chainType !== "bitcoin"
   );
   const [networkKey, setNetworkKey] = useState(evmKeys[0] ?? "ethereum");
-  const [provider, setProvider] = useState<SwapProvider>("lifi");
+  const [provider, setProvider] = useState<SwapProvider>("chainflip");
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -43,11 +43,11 @@ export default function ExchangePage() {
     }
   }, [mnemonic, network.chainType, derivationPath]);
 
-  const thorData = useMemo(() => {
+  const chainflipData = useMemo(() => {
     if (!mnemonic) return { addresses: {} as Record<string, string>, privateKeys: {} as Record<string, string> };
     const addresses: Record<string, string> = {};
     const privateKeys: Record<string, string> = {};
-    for (const key of getThorSupportedNetworks()) {
+    for (const key of getChainflipSupportedNetworks()) {
       const net = allNetworks[key];
       if (!net) continue;
       try {
@@ -90,21 +90,21 @@ export default function ExchangePage() {
           LI.FI
         </button>
         <button
-          onClick={() => setProvider("thorchain")}
+          onClick={() => setProvider("chainflip")}
           className={`py-2 px-4 text-sm font-bold border-b-2 transition-colors ${
-            provider === "thorchain"
+            provider === "chainflip"
               ? "border-blue-500 text-blue-500"
               : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
           }`}
         >
-          THORChain
+          Chainflip
         </button>
       </div>
 
       {provider === "lifi" && (
         <>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Swap tokens across EVM chains and Solana. For BTC swaps, use the THORChain tab.
+            Swap tokens across EVM chains and Solana. For BTC swaps, use the Chainflip tab.
           </p>
           <ExchangeForm
             address={account.address as Address}
@@ -114,12 +114,12 @@ export default function ExchangePage() {
         </>
       )}
 
-      {provider === "thorchain" && (
+      {provider === "chainflip" && (
         <>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Cross-chain swaps via THORChain. Supports Bitcoin, Ethereum, BNB Chain, and Avalanche.
+            Cross-chain swaps via Chainflip. Supports Bitcoin, Ethereum, and Arbitrum.
           </p>
-          <ThorSwapForm addresses={thorData.addresses} privateKeys={thorData.privateKeys} />
+          <ChainflipSwapForm addresses={chainflipData.addresses} privateKeys={chainflipData.privateKeys} />
         </>
       )}
     </div>

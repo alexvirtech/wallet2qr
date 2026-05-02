@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@chainflip/sdk": "^2.1.1",
     "@lifi/sdk": "^3.4.1",
     "@reown/walletkit": "^1.5.5",
     "@scure/bip32": "^1.6.2",
@@ -35,12 +36,16 @@
     "viem": "^2.23.2"
   },
   "devDependencies": {
+    "@cosmjs/encoding": "^0.34.0",
+    "@cosmjs/proto-signing": "^0.34.0",
+    "@cosmjs/stargate": "^0.34.0",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.14.1",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "protobufjs": "^6.11.4",
     "tailwindcss": "^4.1.4",
     "typescript": "^5.8.3",
     "vitest": "^3.1.1"
