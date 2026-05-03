@@ -18,7 +18,7 @@
     "@reown/walletkit": "^1.5.5",
     "@scure/bip32": "^1.6.2",
     "@scure/bip39": "^1.5.4",
-    "@scure/btc-signer": "^2.0.1",
+    "@scure/btc-signer": "^2.2.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/web3.js": "^1.98.4",
@@ -33,12 +33,12 @@
     "qrcode": "^1.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "viem": "^2.23.2"
+    "viem": "^2.48.8"
   },
   "devDependencies": {
-    "@cosmjs/encoding": "^0.34.0",
-    "@cosmjs/proto-signing": "^0.34.0",
-    "@cosmjs/stargate": "^0.34.0",
+    "@cosmjs/encoding": "^0.38.1",
+    "@cosmjs/proto-signing": "^0.38.1",
+    "@cosmjs/stargate": "^0.38.1",
     "@tailwindcss/postcss": "^4.1.4",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.14.1",
