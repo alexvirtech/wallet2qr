@@ -122,8 +122,9 @@ function loadSettings(): WalletSettings {
       } else {
         const ns = stored.networks[key];
         const net = allNetworks[key];
-        if (net?.isDefault && !ns.added) {
+        if (net?.isDefault) {
           ns.added = true;
+          ns.visible = true;
         }
         for (const tkn of Object.keys(defaults.networks[key].tokens)) {
           if (!ns.tokens[tkn]) {
