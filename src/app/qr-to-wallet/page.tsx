@@ -11,7 +11,7 @@ import type { Envelope, V3Envelope } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
-import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
+import { decryptV3, computeProviderIdHash, checkWasmSupport } from "@/lib/compat/cryptoV3";
 import { useSession, saveVault, loadVault, type VaultData } from "@/lib/state/session";
 import { sha256 } from "@noble/hashes/sha256";
 import StepIndicator from "@/components/StepIndicator";
@@ -45,6 +45,7 @@ export default function QrToWalletPage() {
   const [readOnly, setReadOnly] = useState(false);
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [decryptLog, setDecryptLog] = useState<string[]>([]);
   const { setSession, hasVault } = useSession();
   const router = useRouter();
   const { data: authSession, status: authStatus } = useAuthSession();
@@ -153,8 +154,24 @@ export default function QrToWalletPage() {
 
       setDecrypting(true);
       setError(null);
+      const log: string[] = [];
 
       try {
+        const wasmCheck = checkWasmSupport();
+        log.push(`WASM: ${wasmCheck.supported ? "OK" : "NO — " + wasmCheck.reason}`);
+        log.push(`mode: ${v3env.m}, ds: ${v3env.ds.length}ch, salt: ${v3env.s.length}ch`);
+        setDecryptLog([...log]);
+
+        if (!wasmCheck.supported) {
+          setError(`Cannot decrypt: ${wasmCheck.reason}. Try a desktop browser.`);
+          setDecrypting(false);
+          return;
+        }
+
+        log.push("calling decryptV3...");
+        setDecryptLog([...log]);
+        const t0 = Date.now();
+
         const decrypted = await decryptV3(
           v3env.ds,
           password,
@@ -165,6 +182,9 @@ export default function QrToWalletPage() {
           }
         );
 
+        log.push(`decryptV3 done in ${Date.now() - t0}ms, result: ${decrypted ? decrypted.length + "ch" : "null"}`);
+        setDecryptLog([...log]);
+
         if (!decrypted) {
           setError("Decryption failed — wrong password" + (v3NeedsAccount ? " or wrong account" : "") + ".");
           setDecrypting(false);
@@ -173,10 +193,15 @@ export default function QrToWalletPage() {
 
         const validation = validateBip39Mnemonic(decrypted);
         if (!validation.valid) {
+          log.push("mnemonic validation FAILED");
+          setDecryptLog([...log]);
           setError("Decryption produced invalid data.");
           setDecrypting(false);
           return;
         }
+
+        log.push("mnemonic valid ✓");
+        setDecryptLog([...log]);
 
         if (targetMode === "wallet2qr") {
           setSession(decrypted, password, readOnly);
@@ -193,7 +218,10 @@ export default function QrToWalletPage() {
         }
         return;
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Decryption failed");
+        const msg = err instanceof Error ? err.message : String(err);
+        log.push(`ERROR: ${msg}`);
+        setDecryptLog([...log]);
+        setError(msg);
         setDecrypting(false);
         return;
       }
@@ -484,18 +512,22 @@ export default function QrToWalletPage() {
 
       {/* Debug info */}
       {rawQrUrl && envelope && !revealedMnemonic && (
-        <details className="mt-4 text-[10px] text-gray-400 border border-gray-200 dark:border-gray-700 rounded p-2">
+        <details className="mt-4 text-[10px] text-gray-400 border border-gray-200 dark:border-gray-700 rounded p-2" open>
           <summary className="cursor-pointer font-bold">Debug info</summary>
           <div className="mt-2 space-y-1 font-mono break-all">
             <p>v: {envelope.v}</p>
+            <p>m: {isV3 ? v3env?.m : "n/a"}</p>
             <p>ds len: {envelope.ds.length}</p>
             <p>ds[0..30]: {envelope.ds.slice(0, 30)}</p>
-            <p>ds[-20..]: {envelope.ds.slice(-20)}</p>
+            <p>salt(s): {isV3 ? v3env?.s : "n/a"}</p>
             <p>raw url len: {rawQrUrl.length}</p>
-            <p>raw[0..60]: {rawQrUrl.slice(0, 60)}</p>
-            <p>has %: {envelope.ds.includes("%") ? "YES" : "no"}</p>
-            <p>has +: {envelope.ds.includes("+") ? "YES" : "no"}</p>
-            <p>has space: {envelope.ds.includes(" ") ? "YES" : "no"}</p>
+            <p>WASM: {typeof WebAssembly !== "undefined" ? "available" : "NOT AVAILABLE"}</p>
+            {decryptLog.length > 0 && (
+              <div className="mt-2 border-t border-gray-300 dark:border-gray-600 pt-1">
+                <p className="font-bold">Decrypt log:</p>
+                {decryptLog.map((line, i) => <p key={i}>{line}</p>)}
+              </div>
+            )}
           </div>
         </details>
       )}

@@ -62,23 +62,49 @@ export function computeProviderIdHash(stableId: string): string {
 
 // --- Key derivation ---
 
+export function checkWasmSupport(): { supported: boolean; reason?: string } {
+  if (typeof WebAssembly === "undefined") {
+    return { supported: false, reason: "WebAssembly not available (Lockdown Mode or old browser)" };
+  }
+  if (typeof WebAssembly.instantiate !== "function") {
+    return { supported: false, reason: "WebAssembly.instantiate not available" };
+  }
+  return { supported: true };
+}
+
 async function deriveKey(
   password: string,
   salt: Uint8Array,
   factor?: string,
   params: Argon2Params = ARGON2_PARAMS
 ): Promise<Uint8Array> {
+  const wasmCheck = checkWasmSupport();
+  if (!wasmCheck.supported) {
+    throw new Error(`Cannot derive key: ${wasmCheck.reason}`);
+  }
+
   const input = factor ? password + "|" + factor : password;
-  const result = await argon2id({
-    password: input,
-    salt,
-    parallelism: params.parallelism,
-    iterations: params.iterations,
-    memorySize: params.memorySize,
-    hashLength: params.hashLength,
-    outputType: "binary",
-  });
-  return new Uint8Array(result);
+  try {
+    const result = await argon2id({
+      password: input,
+      salt,
+      parallelism: params.parallelism,
+      iterations: params.iterations,
+      memorySize: params.memorySize,
+      hashLength: params.hashLength,
+      outputType: "binary",
+    });
+    return new Uint8Array(result);
+  } catch (e) {
+    console.error("[cryptoV3] argon2id failed:", e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Key derivation failed: ${errMsg}. ` +
+      (typeof navigator !== "undefined" && /iPhone|iPad|iPod/.test(navigator.userAgent)
+        ? "iOS may block WASM — try disabling Lockdown Mode or use a desktop browser."
+        : "WASM execution error — try a different browser.")
+    );
+  }
 }
 
 // --- AES-256-GCM via WebCrypto ---

@@ -10,7 +10,7 @@ import { decryptPayload, decryptPayloadV2 } from "@/lib/compat/qrPayload";
 import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
-import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
+import { decryptV3, computeProviderIdHash, checkWasmSupport } from "@/lib/compat/cryptoV3";
 import type { EncryptionMode } from "@/lib/compat/cryptoV3";
 import { useSession } from "@/lib/state/session";
 import StepIndicator from "@/components/StepIndicator";
@@ -34,18 +34,19 @@ function DeepLinkHandler() {
   const router = useRouter();
   const { setSession } = useSession();
   const { data: authSession, status: authStatus } = useAuthSession();
-  // Use raw extraction for ds to avoid + → space conversion by searchParams
+  // Use getRawParam for ALL critical params to avoid Next.js hydration timing issues
+  // where searchParams might be empty on initial render
   const ds = getRawParam("ds") || searchParams.get("ds");
-  const pw = searchParams.get("pw");
-  const roParam = searchParams.get("readOnly");
-  const v = searchParams.get("v");
-  const pep = searchParams.get("pep");
-  const salt = searchParams.get("s");
-  const encMode = searchParams.get("m") as EncryptionMode | null;
-  const provider = searchParams.get("p");
-  const ph = searchParams.get("ph");
-  const w1 = searchParams.get("w1");
-  const w2 = searchParams.get("w2");
+  const pw = getRawParam("pw") || searchParams.get("pw");
+  const roParam = getRawParam("readOnly") || searchParams.get("readOnly");
+  const v = getRawParam("v") || searchParams.get("v");
+  const pep = getRawParam("pep") || searchParams.get("pep");
+  const salt = getRawParam("s") || searchParams.get("s");
+  const encMode = (getRawParam("m") || searchParams.get("m")) as EncryptionMode | null;
+  const provider = getRawParam("p") || searchParams.get("p");
+  const ph = getRawParam("ph") || searchParams.get("ph");
+  const w1 = getRawParam("w1") || searchParams.get("w1");
+  const w2 = getRawParam("w2") || searchParams.get("w2");
 
   const isV2 = v === "2";
   const isV3 = v === "3";
@@ -61,6 +62,7 @@ function DeepLinkHandler() {
   const [readOnly, setReadOnly] = useState(roParam === "1");
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
+  const [decryptLog, setDecryptLog] = useState<string[]>([]);
 
   const sessionProvider = authSession?.provider ?? null;
   const v3NeedsAccount = isV3 && (encMode === "b" || encMode === "d") && !useBackup;
@@ -89,6 +91,10 @@ function DeepLinkHandler() {
     }
 
     // v3 decrypt
+    if (isV3 && (!salt || !encMode)) {
+      setError(`V3 QR detected but missing params (salt: ${salt ? "ok" : "MISSING"}, mode: ${encMode ?? "MISSING"}). URL may be truncated.`);
+      return;
+    }
     if (isV3 && salt && encMode) {
       if (v3NeedsAccount && !usesSocialFactor) {
         if (!selectedProvider) {
@@ -105,8 +111,24 @@ function DeepLinkHandler() {
 
       setDecrypting(true);
       setError(null);
+      const log: string[] = [];
 
       try {
+        const wasmCheck = checkWasmSupport();
+        log.push(`WASM: ${wasmCheck.supported ? "OK" : "NO — " + wasmCheck.reason}`);
+        log.push(`mode: ${encMode}, ds: ${ds.length}ch, salt: ${salt.length}ch`);
+        setDecryptLog([...log]);
+
+        if (!wasmCheck.supported) {
+          setError(`Cannot decrypt: ${wasmCheck.reason}. Try a desktop browser.`);
+          setDecrypting(false);
+          return;
+        }
+
+        log.push("calling decryptV3...");
+        setDecryptLog([...log]);
+        const t0 = Date.now();
+
         const decrypted = await decryptV3(ds, pass, salt, {
           mode: encMode,
           providerStableId: v3NeedsAccount && usesSocialFactor && providerSub ? providerSub : undefined,
@@ -114,6 +136,9 @@ function DeepLinkHandler() {
           wrappedKey1B64: w1 ?? undefined,
           wrappedKey2B64: w2 ?? undefined,
         });
+
+        log.push(`done in ${Date.now() - t0}ms, result: ${decrypted ? decrypted.length + "ch" : "null"}`);
+        setDecryptLog([...log]);
 
         if (!decrypted) {
           setError("Decryption failed — wrong password" +
@@ -125,10 +150,15 @@ function DeepLinkHandler() {
 
         const validation = validateBip39Mnemonic(decrypted);
         if (!validation.valid) {
+          log.push("mnemonic validation FAILED");
+          setDecryptLog([...log]);
           setError("Decryption produced invalid data.");
           setDecrypting(false);
           return;
         }
+
+        log.push("mnemonic valid ✓");
+        setDecryptLog([...log]);
 
         if (targetMode === "wallet2qr") {
           setSession(decrypted, pass, readOnly);
@@ -144,7 +174,10 @@ function DeepLinkHandler() {
           setDecrypting(false);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Decryption failed");
+        const msg = err instanceof Error ? err.message : String(err);
+        log.push(`ERROR: ${msg}`);
+        setDecryptLog([...log]);
+        setError(msg);
         setDecrypting(false);
       }
       return;
@@ -410,6 +443,21 @@ function DeepLinkHandler() {
           </div>
         </div>
       </div>
+
+      {/* Debug info */}
+      <details className="mt-4 text-[10px] text-gray-400 border border-gray-200 dark:border-gray-700 rounded p-2" open>
+        <summary className="cursor-pointer font-bold">Debug info</summary>
+        <div className="mt-2 space-y-1 font-mono break-all">
+          <p>v: {v ?? "1"} | m: {encMode ?? "n/a"} | ds: {ds?.length ?? 0}ch | s: {salt?.length ?? 0}ch</p>
+          <p>WASM: {typeof WebAssembly !== "undefined" ? "available" : "NOT AVAILABLE"}</p>
+          {decryptLog.length > 0 && (
+            <div className="mt-1 border-t border-gray-300 dark:border-gray-600 pt-1">
+              <p className="font-bold">Decrypt log:</p>
+              {decryptLog.map((line, i) => <p key={i}>{line}</p>)}
+            </div>
+          )}
+        </div>
+      </details>
 
       {/* Security indicators */}
       <div className="mt-6 space-y-4">
