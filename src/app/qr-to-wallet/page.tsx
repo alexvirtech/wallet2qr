@@ -482,6 +482,24 @@ export default function QrToWalletPage() {
 
       {!rawQrUrl && error && <p className="text-m-red text-sm mt-4">{error}</p>}
 
+      {/* Debug info */}
+      {rawQrUrl && envelope && !revealedMnemonic && (
+        <details className="mt-4 text-[10px] text-gray-400 border border-gray-200 dark:border-gray-700 rounded p-2">
+          <summary className="cursor-pointer font-bold">Debug info</summary>
+          <div className="mt-2 space-y-1 font-mono break-all">
+            <p>v: {envelope.v}</p>
+            <p>ds len: {envelope.ds.length}</p>
+            <p>ds[0..30]: {envelope.ds.slice(0, 30)}</p>
+            <p>ds[-20..]: {envelope.ds.slice(-20)}</p>
+            <p>raw url len: {rawQrUrl.length}</p>
+            <p>raw[0..60]: {rawQrUrl.slice(0, 60)}</p>
+            <p>has %: {envelope.ds.includes("%") ? "YES" : "no"}</p>
+            <p>has +: {envelope.ds.includes("+") ? "YES" : "no"}</p>
+            <p>has space: {envelope.ds.includes(" ") ? "YES" : "no"}</p>
+          </div>
+        </details>
+      )}
+
       {/* Security indicators */}
       {rawQrUrl && !revealedMnemonic && (
         <div className="mt-6 space-y-4">
