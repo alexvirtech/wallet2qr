@@ -28,7 +28,6 @@ const PUBLIC_RPCS: Record<string, string> = {
   arbitrum: "https://arbitrum-one-rpc.publicnode.com",
   avalanche: "https://avalanche-c-chain-rpc.publicnode.com",
   bnb: "https://bsc-rpc.publicnode.com",
-  solana: "https://solana-rpc.publicnode.com",
 };
 
 function withPublicRpcs(accounts: NetworkAccount[]): NetworkAccount[] {
