@@ -12,7 +12,7 @@ import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
 import { decryptV3, computeProviderIdHash, checkWasmSupport } from "@/lib/compat/cryptoV3";
-import { useSession, saveVault, loadVault, type VaultData } from "@/lib/state/session";
+import { useSession, saveVault, loadVault, clearVault, clearSession, type VaultData } from "@/lib/state/session";
 import { sha256 } from "@noble/hashes/sha256";
 import StepIndicator from "@/components/StepIndicator";
 import type { Step } from "@/components/StepIndicator";
@@ -62,6 +62,8 @@ export default function QrToWalletPage() {
       setRawQrUrl(savedQr);
       const env = parseEnvelope(savedQr);
       setEnvelope(env);
+      setDecryptLog([]);
+      clearSession();
       saveVault({ rawQrUrl: savedQr, envelope: env, version: env?.v ?? 1 });
     }
     const savedProvider = sessionStorage.getItem(SS_PROVIDER_KEY);
@@ -100,6 +102,8 @@ export default function QrToWalletPage() {
     setEnvelope(env);
     setError(null);
     setSelectedProvider(null);
+    setDecryptLog([]);
+    clearSession();
     saveVault({ rawQrUrl: rawUrl, envelope: env, version: env?.v ?? 1 });
   }, []);
 

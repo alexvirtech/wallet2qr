@@ -51,7 +51,7 @@ async function loadSession(): Promise<StoredSession | null> {
   return null;
 }
 
-async function clearSession() {
+export async function clearSession() {
   await idbDelete(SESSION_KEY);
   try { localStorage.removeItem("w2q_session"); } catch {}
 }
