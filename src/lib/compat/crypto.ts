@@ -29,16 +29,29 @@ export function encrypt(text: string, password: string): string {
 
 // Decryption function — byte-identical to text2qrApp/src/utils/crypto.js
 export function decrypt(text: string, password: string): string | null {
+  // Try multiple decode strategies to handle both percent-encoded and raw base64 input
+  const candidates = [text];
   try {
-    const decodedText = decodeURIComponent(text);
-    const decrypted = CryptoJS.AES.decrypt(decodedText, password);
-    const result = decrypted.toString(CryptoJS.enc.Utf8);
-    if (!result) return null;
-    if (/[\x00-\x08\x0E-\x1F]/.test(result)) return null;
-    return result;
-  } catch {
-    return null;
+    const decoded = decodeURIComponent(text);
+    if (decoded !== text) candidates.push(decoded);
+  } catch {}
+  // If text looks double-encoded (contains %25), try decoding twice
+  if (text.includes("%25")) {
+    try { candidates.push(decodeURIComponent(decodeURIComponent(text))); } catch {}
   }
+
+  for (const candidate of candidates) {
+    try {
+      const decrypted = CryptoJS.AES.decrypt(candidate, password);
+      const result = decrypted.toString(CryptoJS.enc.Utf8);
+      if (!result) continue;
+      if (/[\x00-\x08\x0E-\x1F]/.test(result)) continue;
+      return result;
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 export function validatePasswordStrength(password: string): string | null {

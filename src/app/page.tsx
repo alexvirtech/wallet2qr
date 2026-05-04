@@ -23,12 +23,19 @@ type DeepLinkMode = "mnemonic" | "wallet2qr" | "extrasafe" | "tinywallet";
 const EXTRASAFE_URL = "https://www.extrasafe.online";
 const TINYWALLET_URL = "https://www.tiny-wallet.com";
 
+function getRawParam(name: string): string | null {
+  if (typeof window === "undefined") return null;
+  const match = window.location.search.match(new RegExp(`[?&]${name}=([^&]*)`));
+  return match ? match[1] : null;
+}
+
 function DeepLinkHandler() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setSession } = useSession();
   const { data: authSession, status: authStatus } = useAuthSession();
-  const ds = searchParams.get("ds");
+  // Use raw extraction for ds to avoid + → space conversion by searchParams
+  const ds = getRawParam("ds") || searchParams.get("ds");
   const pw = searchParams.get("pw");
   const roParam = searchParams.get("readOnly");
   const v = searchParams.get("v");
@@ -794,7 +801,7 @@ function SecuritySection() {
 
 function LandingContent() {
   const searchParams = useSearchParams();
-  const ds = searchParams.get("ds");
+  const ds = getRawParam("ds") || searchParams.get("ds");
 
   if (ds) return <DeepLinkHandler />;
 

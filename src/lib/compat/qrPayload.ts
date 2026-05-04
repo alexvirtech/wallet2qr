@@ -71,16 +71,25 @@ export function buildQrUrlV3(result: V3EncryptResult): string {
 
 // --- Envelope parser (all versions) ---
 
+function getRawParam(url: string, name: string): string {
+  const re = new RegExp(`[?&]${name}=([^&]*)`);
+  const m = url.match(re);
+  return m ? m[1] : "";
+}
+
 export function parseEnvelope(url: string): Envelope {
   try {
     const u = new URL(url);
-    const ds = u.searchParams.get("ds") ?? "";
     const v = u.searchParams.get("v");
+    // Use the raw (still-percent-encoded) ds value so decrypt() can
+    // handle decoding. searchParams.get() silently converts + to space
+    // which corrupts base64 payloads in v1/v2 QR codes.
+    const ds = getRawParam(url, "ds") || u.searchParams.get("ds") || "";
 
     if (v === "3") {
       return {
         v: 3,
-        ds,
+        ds: u.searchParams.get("ds") ?? "",
         m: (u.searchParams.get("m") || "a") as EncryptionMode,
         s: u.searchParams.get("s") ?? "",
         p: u.searchParams.get("p") || undefined,
