@@ -56,6 +56,18 @@ export async function clearSession() {
   try { localStorage.removeItem("w2q_session"); } catch {}
 }
 
+export function clearWalletState() {
+  try {
+    localStorage.removeItem("w2q_balances");
+    localStorage.removeItem("w2q_balances_v2");
+    localStorage.removeItem("w2q_network");
+    localStorage.removeItem("w2q_hideZero");
+    localStorage.removeItem("w2q_prices");
+    localStorage.removeItem("w2q_icons");
+    localStorage.removeItem("wallet2qr_settings");
+  } catch {}
+}
+
 export async function saveVault(data: VaultData): Promise<void> {
   await idbSet(VAULT_KEY, data);
 }
