@@ -849,9 +849,28 @@ function SecuritySection() {
 
 function LandingContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const ds = getRawParam("ds") || searchParams.get("ds");
+  const v = getRawParam("v") || searchParams.get("v");
 
-  if (ds) return <DeepLinkHandler />;
+  useEffect(() => {
+    if (ds && (v === "3" || v === "2")) {
+      const fullUrl = window.location.href;
+      sessionStorage.setItem("w2q_pending_qr", fullUrl);
+      router.replace("/qr-to-wallet");
+    }
+  }, [ds, v, router]);
+
+  if (ds) {
+    if (v === "3" || v === "2") {
+      return (
+        <div className="w-full max-w-md mx-auto px-4 py-12 text-center">
+          <p className="text-sm text-gray-500">Redirecting to decrypt page...</p>
+        </div>
+      );
+    }
+    return <DeepLinkHandler />;
+  }
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4 sm:px-6">
