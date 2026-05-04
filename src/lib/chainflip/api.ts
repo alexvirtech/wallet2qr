@@ -1,14 +1,3 @@
-import { SwapSDK } from "@chainflip/sdk/swap";
-
-let sdkInstance: SwapSDK | null = null;
-
-function getSDK(): SwapSDK {
-  if (!sdkInstance) {
-    sdkInstance = new SwapSDK({ network: "mainnet" });
-  }
-  return sdkInstance;
-}
-
 interface ChainflipAsset {
   chain: "Bitcoin" | "Ethereum" | "Arbitrum";
   asset: "BTC" | "ETH" | "USDC" | "USDT" | "FLIP";
@@ -53,8 +42,6 @@ export interface ChainflipQuoteResult {
   recommendedRetryDurationMinutes: number;
   includedFees: { type: string; amount: string; asset: string }[];
   lowLiquidityWarning?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  raw: any;
 }
 
 export async function getChainflipQuote(
@@ -64,12 +51,11 @@ export async function getChainflipQuote(
   destToken: string,
   amountBaseUnits: string
 ): Promise<ChainflipQuoteResult> {
-  const sdk = getSDK();
   const src = getChainflipAsset(srcNetwork, srcToken);
   const dest = getChainflipAsset(destNetwork, destToken);
   if (!src || !dest) throw new Error("Unsupported asset pair for Chainflip");
 
-  const response = await sdk.getQuoteV2({
+  const params = new URLSearchParams({
     srcChain: src.chain,
     srcAsset: src.asset,
     destChain: dest.chain,
@@ -77,25 +63,14 @@ export async function getChainflipQuote(
     amount: amountBaseUnits,
   });
 
-  const quote = response.quotes.find((q: { type: string }) => q.type === "REGULAR");
-  if (!quote) throw new Error("No quote available for this pair");
+  const res = await fetch(`/api/chainflip/quote?${params}`);
+  const data = await res.json();
 
-  return {
-    egressAmount: quote.egressAmount,
-    estimatedPrice: quote.estimatedPrice,
-    estimatedDurationSeconds: quote.estimatedDurationSeconds,
-    recommendedSlippageTolerancePercent: quote.recommendedSlippageTolerancePercent,
-    recommendedRetryDurationMinutes: quote.recommendedRetryDurationMinutes,
-    includedFees: (quote.includedFees ?? []).map(
-      (f: { type: string; amount: string; asset: string }) => ({
-        type: f.type,
-        amount: f.amount,
-        asset: f.asset,
-      })
-    ),
-    lowLiquidityWarning: quote.lowLiquidityWarning ?? false,
-    raw: quote,
-  };
+  if (!res.ok) {
+    throw new Error(data.error || `Quote failed (${res.status})`);
+  }
+
+  return data;
 }
 
 export interface ChainflipDepositResult {
@@ -115,36 +90,36 @@ export async function requestChainflipDeposit(
   slippagePercent: number,
   retryMinutes: number
 ): Promise<ChainflipDepositResult> {
-  const sdk = getSDK();
   const src = getChainflipAsset(srcNetwork, srcToken);
   const dest = getChainflipAsset(destNetwork, destToken);
   if (!src || !dest) throw new Error("Unsupported asset pair for Chainflip");
 
-  const quoteResponse = await sdk.getQuoteV2({
-    srcChain: src.chain,
-    srcAsset: src.asset,
-    destChain: dest.chain,
-    destAsset: dest.asset,
-    amount: amountBaseUnits,
-  });
-
-  const quote = quoteResponse.quotes.find((q: { type: string }) => q.type === "REGULAR");
-  if (!quote) throw new Error("No quote available");
-
-  const deposit = await sdk.requestDepositAddressV2({
-    quote: quote,
-    destAddress,
-    fillOrKillParams: {
-      slippageTolerancePercent: String(slippagePercent),
+  const res = await fetch("/api/chainflip/deposit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      srcChain: src.chain,
+      srcAsset: src.asset,
+      destChain: dest.chain,
+      destAsset: dest.asset,
+      amount: amountBaseUnits,
+      destAddress,
       refundAddress,
+      slippageTolerancePercent: slippagePercent,
       retryDurationMinutes: retryMinutes,
-    },
+    }),
   });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || `Deposit request failed (${res.status})`);
+  }
 
   return {
-    depositAddress: deposit.depositAddress,
-    depositChannelId: deposit.depositChannelId,
-    estimatedExpiryTime: deposit.estimatedDepositChannelExpiryTime ?? undefined,
+    depositAddress: data.depositAddress,
+    depositChannelId: data.depositChannelId,
+    estimatedExpiryTime: data.estimatedExpiryTime ?? undefined,
   };
 }
 
@@ -160,17 +135,20 @@ export interface ChainflipStatus {
 export async function getChainflipStatus(
   channelId: string
 ): Promise<ChainflipStatus> {
-  const sdk = getSDK();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const status: any = await sdk.getStatusV2({ id: channelId });
+  const res = await fetch(`/api/chainflip/status?id=${encodeURIComponent(channelId)}`);
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.error || `Status request failed (${res.status})`);
+  }
 
   return {
-    state: status.state,
-    depositTxRef: status.deposit?.txRef,
-    depositConfirmations: status.deposit?.txConfirmations,
-    egressTxRef: status.swapEgress?.txRef,
-    egressAmount: status.swapEgress?.amount,
-    refundTxRef: status.refundEgress?.txRef,
+    state: data.state,
+    depositTxRef: data.deposit?.txRef,
+    depositConfirmations: data.deposit?.txConfirmations,
+    egressTxRef: data.swapEgress?.txRef,
+    egressAmount: data.swapEgress?.amount,
+    refundTxRef: data.refundEgress?.txRef,
   };
 }
 

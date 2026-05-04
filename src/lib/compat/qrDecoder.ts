@@ -1,4 +1,5 @@
 import jsQR from "jsqr";
+import QrScanner from "qr-scanner";
 
 // Extract the encrypted payload (ds param only) from a QR code URL string
 export function extractPayloadFromQrData(data: string): string {
@@ -118,4 +119,20 @@ export function decodeQrFromImageDataEnhanced(
   if (qr?.data) return qr.data;
 
   return null;
+}
+
+// Fallback decoder using qr-scanner (handles perspective, rotation, real-world photos).
+// Used when jsQR-based decoding fails — e.g. photos of physical QR cards.
+export async function decodeQrFromImageAsync(
+  source: HTMLImageElement | HTMLCanvasElement | File
+): Promise<string | null> {
+  try {
+    const result = await QrScanner.scanImage(source, {
+      returnDetailedScanResult: true,
+      alsoTryWithoutScanRegion: true,
+    });
+    return result?.data || null;
+  } catch {
+    return null;
+  }
 }

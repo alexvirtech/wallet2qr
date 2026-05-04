@@ -7,13 +7,13 @@ import { useSession } from "@/lib/state/session";
 import { useSettings } from "@/lib/wallet/settings";
 import { deriveAccount } from "@/lib/wallet/derive";
 import { getNetwork, allNetworks } from "@/lib/wallet/networks";
-import { getChainflipSupportedNetworks } from "@/lib/chainflip/api";
+import { getCross2ChainSupportedNetworks } from "@/lib/cross2chain/api";
 import NetworkSwitcher from "@/components/NetworkSwitcher";
 import ExchangeForm from "@/components/ExchangeForm";
-import ChainflipSwapForm from "@/components/ChainflipSwapForm";
+import Cross2ChainSwapForm from "@/components/Cross2ChainSwapForm";
 import type { Hex, Address } from "viem";
 
-type SwapProvider = "lifi" | "chainflip";
+type SwapProvider = "lifi" | "cross2chain";
 
 export default function ExchangePage() {
   const { mnemonic, isUnlocked, readOnly } = useSession();
@@ -24,7 +24,7 @@ export default function ExchangePage() {
     (k) => getNetwork(k).chainType !== "bitcoin"
   );
   const [networkKey, setNetworkKey] = useState(evmKeys[0] ?? "ethereum");
-  const [provider, setProvider] = useState<SwapProvider>("chainflip");
+  const [provider, setProvider] = useState<SwapProvider>("cross2chain");
 
   useEffect(() => {
     if (!isUnlocked) router.push("/qr-to-wallet");
@@ -43,11 +43,11 @@ export default function ExchangePage() {
     }
   }, [mnemonic, network.chainType, derivationPath]);
 
-  const chainflipData = useMemo(() => {
+  const cross2chainData = useMemo(() => {
     if (!mnemonic) return { addresses: {} as Record<string, string>, privateKeys: {} as Record<string, string> };
     const addresses: Record<string, string> = {};
     const privateKeys: Record<string, string> = {};
-    for (const key of getChainflipSupportedNetworks()) {
+    for (const key of getCross2ChainSupportedNetworks()) {
       const net = allNetworks[key];
       if (!net) continue;
       try {
@@ -75,6 +75,9 @@ export default function ExchangePage() {
           {provider === "lifi" && (
             <NetworkSwitcher current={networkKey} onChange={setNetworkKey} />
           )}
+          {provider === "cross2chain" && (
+            <span className="text-xs text-gray-400">BTC &harr; ETH</span>
+          )}
         </div>
       </div>
 
@@ -90,21 +93,21 @@ export default function ExchangePage() {
           LI.FI
         </button>
         <button
-          onClick={() => setProvider("chainflip")}
+          onClick={() => setProvider("cross2chain")}
           className={`py-2 px-4 text-sm font-bold border-b-2 transition-colors ${
-            provider === "chainflip"
+            provider === "cross2chain"
               ? "border-blue-500 text-blue-500"
               : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
           }`}
         >
-          Chainflip
+          Cross-Chain
         </button>
       </div>
 
       {provider === "lifi" && (
         <>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Swap tokens across EVM chains and Solana. For BTC swaps, use the Chainflip tab.
+            Swap tokens across EVM chains and Solana. For BTC &harr; ETH swaps, use the Cross-Chain tab.
           </p>
           <ExchangeForm
             address={account.address as Address}
@@ -114,12 +117,12 @@ export default function ExchangePage() {
         </>
       )}
 
-      {provider === "chainflip" && (
+      {provider === "cross2chain" && (
         <>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Cross-chain swaps via Chainflip. Supports Bitcoin, Ethereum, and Arbitrum.
+            Non-custodial BTC &harr; ETH swaps via Cross2Chain. Best route auto-selected from multiple providers.
           </p>
-          <ChainflipSwapForm addresses={chainflipData.addresses} privateKeys={chainflipData.privateKeys} />
+          <Cross2ChainSwapForm addresses={cross2chainData.addresses} privateKeys={cross2chainData.privateKeys} />
         </>
       )}
     </div>

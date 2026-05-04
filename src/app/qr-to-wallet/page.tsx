@@ -12,7 +12,7 @@ import { deterministicMnemonic } from "@/lib/compat/crypto";
 import { validateBip39Mnemonic } from "@/lib/wallet/derive";
 import { fetchPepper } from "@/lib/compat/fetchPepper";
 import { decryptV3, computeProviderIdHash } from "@/lib/compat/cryptoV3";
-import { useSession } from "@/lib/state/session";
+import { useSession, saveVault, loadVault, type VaultData } from "@/lib/state/session";
 import { sha256 } from "@noble/hashes/sha256";
 import StepIndicator from "@/components/StepIndicator";
 import type { Step } from "@/components/StepIndicator";
@@ -45,7 +45,7 @@ export default function QrToWalletPage() {
   const [readOnly, setReadOnly] = useState(false);
   const [revealedMnemonic, setRevealedMnemonic] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
-  const { setSession } = useSession();
+  const { setSession, hasVault } = useSession();
   const router = useRouter();
   const { data: authSession, status: authStatus } = useAuthSession();
 
@@ -59,7 +59,9 @@ export default function QrToWalletPage() {
     if (savedQr) {
       sessionStorage.removeItem(SS_QR_KEY);
       setRawQrUrl(savedQr);
-      setEnvelope(parseEnvelope(savedQr));
+      const env = parseEnvelope(savedQr);
+      setEnvelope(env);
+      saveVault({ rawQrUrl: savedQr, envelope: env, version: env?.v ?? 1 });
     }
     const savedProvider = sessionStorage.getItem(SS_PROVIDER_KEY);
     if (savedProvider) {
@@ -95,6 +97,16 @@ export default function QrToWalletPage() {
     setRawQrUrl(rawUrl);
     const env = parseEnvelope(rawUrl);
     setEnvelope(env);
+    setError(null);
+    setSelectedProvider(null);
+    saveVault({ rawQrUrl: rawUrl, envelope: env, version: env?.v ?? 1 });
+  }, []);
+
+  const handleUnlockFromVault = useCallback(async () => {
+    const vault = await loadVault();
+    if (!vault) return;
+    setRawQrUrl(vault.rawQrUrl);
+    setEnvelope(vault.envelope as Envelope);
     setError(null);
     setSelectedProvider(null);
   }, []);
@@ -304,7 +316,17 @@ export default function QrToWalletPage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-2">QR &rarr; Wallet</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold">QR &rarr; Wallet</h1>
+        {hasVault && !rawQrUrl && (
+          <button
+            onClick={handleUnlockFromVault}
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-md text-sm"
+          >
+            Unlock
+          </button>
+        )}
+      </div>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
         Scan or upload an encrypted QR code to unlock your wallet.
       </p>

@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import {
   decodeQrFromImage,
+  decodeQrFromImageAsync,
   decodeQrFromImageData,
   decodeQrFromImageDataEnhanced,
 } from "@/lib/compat/qrDecoder";
@@ -20,45 +21,47 @@ export default function QrScanner({ onDecoded, onError }: QrScannerProps) {
   const rafRef = useRef<number>(0);
   const [scanning, setScanning] = useState(false);
 
-  const handleFile = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
+  const decodeFileOrImage = useCallback(
+    async (file: File) => {
       const img = new Image();
-      img.onload = () => {
-        const qrData = decodeQrFromImage(img);
-        if (qrData) {
-          onDecoded(qrData);
-        } else {
-          onError("No QR code found in the image.");
-        }
-      };
-      img.onerror = () => onError("Failed to load the image.");
-      img.src = URL.createObjectURL(file);
+      const url = URL.createObjectURL(file);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject();
+          img.src = url;
+        });
+      } catch {
+        onError("Failed to load the image.");
+        return;
+      }
+
+      const qrData = decodeQrFromImage(img);
+      if (qrData) { onDecoded(qrData); return; }
+
+      const fallback = await decodeQrFromImageAsync(file) ?? await decodeQrFromImageAsync(img);
+      if (fallback) { onDecoded(fallback); return; }
+
+      onError("No QR code found in the image.");
     },
     [onDecoded, onError]
+  );
+
+  const handleFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) decodeFileOrImage(file);
+    },
+    [decodeFileOrImage]
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       const file = e.dataTransfer.files[0];
-      if (!file) return;
-
-      const img = new Image();
-      img.onload = () => {
-        const qrData = decodeQrFromImage(img);
-        if (qrData) {
-          onDecoded(qrData);
-        } else {
-          onError("No QR code found in the image.");
-        }
-      };
-      img.onerror = () => onError("Failed to load the image.");
-      img.src = URL.createObjectURL(file);
+      if (file) decodeFileOrImage(file);
     },
-    [onDecoded, onError]
+    [decodeFileOrImage]
   );
 
   const stopCamera = useCallback(() => {

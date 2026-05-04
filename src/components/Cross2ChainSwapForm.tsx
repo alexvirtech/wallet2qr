@@ -1,51 +1,39 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { createWalletClient, http, parseUnits, type Address, type Hex, type Chain } from "viem";
+import { createWalletClient, http, parseEther, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { mainnet, arbitrum } from "viem/chains";
+import { mainnet } from "viem/chains";
 import { allNetworks } from "@/lib/wallet/networks";
-import { getNativeBalance, getTokenBalance } from "@/lib/wallet/tokens";
+import { getNativeBalance } from "@/lib/wallet/tokens";
 import { getBtcBalance } from "@/lib/wallet/bitcoin";
-import { sendBtc, fetchFeeRates, getFeeRate, type FeeSpeed } from "@/lib/wallet/btcSend";
+import { sendBtcWithMemo, sendBtc, fetchFeeRates, getFeeRate, type FeeSpeed } from "@/lib/wallet/btcSend";
 import { fetchPrices } from "@/lib/wallet/prices";
 import {
-  getChainflipSupportedNetworks,
-  getChainflipAsset,
-  getChainflipQuote,
-  requestChainflipDeposit,
-  getChainflipStatus,
-  getChainflipDecimals,
-  formatChainflipAmount,
-  isChainflipToken,
-  type ChainflipQuoteResult,
-} from "@/lib/chainflip/api";
+  getCross2ChainSupportedNetworks,
+  getCross2ChainQuote,
+  createCross2ChainSwap,
+  getCross2ChainStatus,
+  TERMINAL_STATUSES,
+  type QuoteResponse,
+  type SwapQuote,
+  type SwapResult,
+} from "@/lib/cross2chain/api";
 
-interface ChainflipSwapFormProps {
+interface Cross2ChainSwapFormProps {
   addresses: Record<string, string>;
   privateKeys: Record<string, string>;
 }
 
-interface TokenOption {
-  symbol: string;
-  label: string;
-  address?: string;
-  decimals: number;
-}
+const LIMITS: Record<string, { min: number; max: number }> = {
+  bitcoin: { min: 0.0001, max: 10 },
+  ethereum: { min: 0.01, max: 100 },
+};
 
-function getTokensForNetwork(networkKey: string): TokenOption[] {
-  const net = allNetworks[networkKey];
-  if (!net) return [];
-  const list: TokenOption[] = [
-    { symbol: net.nativeCurrency.symbol, label: net.nativeCurrency.symbol, decimals: net.nativeCurrency.decimals },
-  ];
-  for (const t of net.tokens) {
-    if (isChainflipToken(networkKey, t.symbol)) {
-      list.push({ symbol: t.symbol, label: t.symbol, address: t.address, decimals: t.decimals });
-    }
-  }
-  return list;
-}
+const SYMBOLS: Record<string, string> = {
+  bitcoin: "BTC",
+  ethereum: "ETH",
+};
 
 function logSwap(data: Record<string, unknown>) {
   fetch("/api/admin/log-swap", {
@@ -55,20 +43,26 @@ function logSwap(data: Record<string, unknown>) {
   }).catch(() => {});
 }
 
-const EVM_CHAINS: Record<number, Chain> = {
-  [mainnet.id]: mainnet,
-  [arbitrum.id]: arbitrum,
+const STATUS_LABELS: Record<string, string> = {
+  waiting_for_deposit: "Waiting for deposit",
+  deposit_detected: "Deposit detected",
+  confirming_source: "Confirming on source chain",
+  swap_executing: "Swap in progress",
+  destination_prepared: "Funds ready on destination",
+  completed: "Completed",
+  failed: "Failed",
+  refunded: "Refunded",
 };
 
-export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipSwapFormProps) {
-  const supportedKeys = getChainflipSupportedNetworks();
+export default function Cross2ChainSwapForm({ addresses, privateKeys }: Cross2ChainSwapFormProps) {
+  const supportedKeys = getCross2ChainSupportedNetworks();
 
   const [fromChain, setFromChain] = useState(supportedKeys.includes("bitcoin") ? "bitcoin" : supportedKeys[0]);
   const [toChain, setToChain] = useState(supportedKeys.includes("ethereum") ? "ethereum" : supportedKeys[1] ?? supportedKeys[0]);
-  const [fromTokenIdx, setFromTokenIdx] = useState(0);
-  const [toTokenIdx, setToTokenIdx] = useState(0);
   const [amount, setAmount] = useState("");
-  const [quote, setQuote] = useState<ChainflipQuoteResult | null>(null);
+  const [quoteResponse, setQuoteResponse] = useState<QuoteResponse | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<SwapQuote | null>(null);
+  const [swap, setSwap] = useState<SwapResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string | null>(null);
@@ -76,18 +70,16 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
   const [executing, setExecuting] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [swapStep, setSwapStep] = useState<string | null>(null);
-  const [channelId, setChannelId] = useState<string | null>(null);
-  const [swapState, setSwapState] = useState<string | null>(null);
+  const [swapStatus, setSwapStatus] = useState<string | null>(null);
+  const [destTxHash, setDestTxHash] = useState<string | null>(null);
   const [feeSpeed, setFeeSpeed] = useState<FeeSpeed | "custom">("fast");
   const [customFeeRate, setCustomFeeRate] = useState("");
   const [feeRates, setFeeRates] = useState<{ fastestFee: number; halfHourFee: number; hourFee: number; minimumFee: number } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fromTokens = useMemo(() => getTokensForNetwork(fromChain), [fromChain]);
-  const toTokens = useMemo(() => getTokensForNetwork(toChain), [toChain]);
-  const fromToken = fromTokens[fromTokenIdx] ?? fromTokens[0];
-  const toToken = toTokens[toTokenIdx] ?? toTokens[0];
-  const isBtcSource = allNetworks[fromChain]?.chainType === "bitcoin";
+  const isBtcSource = fromChain === "bitcoin";
+  const fromSymbol = SYMBOLS[fromChain] ?? fromChain.toUpperCase();
+  const toSymbol = SYMBOLS[toChain] ?? toChain.toUpperCase();
 
   useEffect(() => {
     return () => {
@@ -107,18 +99,13 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
         if (net.chainType === "bitcoin") {
           result = await getBtcBalance(addr);
         } else if (net.chainType === "evm") {
-          const tokens = getTokensForNetwork(fromChain);
-          const info = tokens[fromTokenIdx] ?? tokens[0];
-          if (!info) return;
-          result = info.address
-            ? await getTokenBalance(net, info.address as Address, addr as Address, info.decimals)
-            : await getNativeBalance(net, addr as Address);
+          result = await getNativeBalance(net, addr as Address);
         }
         if (!cancelled && result) setBalance(result.formatted);
       } catch { if (!cancelled) setBalance(null); }
     })();
     return () => { cancelled = true; };
-  }, [fromChain, fromTokenIdx, addresses]);
+  }, [fromChain, addresses]);
 
   useEffect(() => { fetchPrices().then(setPrices); }, []);
 
@@ -128,11 +115,11 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
 
   const usdEstimate = useMemo(() => {
     const amt = parseFloat(amount);
-    const price = prices[fromToken?.symbol ?? ""];
+    const price = prices[fromSymbol];
     if (!amt || !price) return null;
     const val = amt * price;
     return val >= 0.01 ? val.toFixed(2) : val.toPrecision(2);
-  }, [amount, prices, fromToken?.symbol]);
+  }, [amount, prices, fromSymbol]);
 
   const activeFeeRate = useMemo(() => {
     if (feeSpeed === "custom") return parseInt(customFeeRate) || 20;
@@ -140,81 +127,72 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
     return getFeeRate(feeRates, feeSpeed);
   }, [feeSpeed, customFeeRate, feeRates]);
 
-  const startStatusPoll = useCallback((id: string) => {
+  const startStatusPoll = useCallback((swapId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const status = await getChainflipStatus(id);
-        setSwapState(status.state);
-        switch (status.state) {
-          case "WAITING":
-            setSwapStep("Waiting for deposit confirmation...");
-            break;
-          case "RECEIVING":
-            setSwapStep(`Deposit detected (${status.depositConfirmations ?? 0} confirmations)...`);
-            break;
-          case "SWAPPING":
-            setSwapStep("Swap in progress...");
-            break;
-          case "SENDING":
-            setSwapStep("Sending to destination...");
-            break;
-          case "SENT":
-          case "COMPLETED":
-            setSwapStep("Swap completed!");
-            if (pollRef.current) clearInterval(pollRef.current);
-            break;
-          case "FAILED":
-            setSwapStep("Swap failed" + (status.refundTxRef ? " - refund sent" : ""));
+        const status = await getCross2ChainStatus(swapId);
+        setSwapStatus(status.status);
+        setSwapStep(STATUS_LABELS[status.status] ?? status.status);
+        if (status.destinationTxHash) setDestTxHash(status.destinationTxHash);
+        if (TERMINAL_STATUSES.includes(status.status)) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          if (status.status === "failed") {
             setError("Swap failed. Funds will be refunded to your address.");
-            if (pollRef.current) clearInterval(pollRef.current);
-            break;
+          }
         }
       } catch { /* ignore poll errors */ }
-    }, 15_000);
+    }, 20_000);
   }, []);
 
   const handleQuote = useCallback(async () => {
     setError(null);
-    setQuote(null);
+    setQuoteResponse(null);
+    setSelectedRoute(null);
+    setSwap(null);
     setTxHash(null);
-    setChannelId(null);
-    setSwapState(null);
-    if (!amount || parseFloat(amount) <= 0) {
+    setSwapStatus(null);
+    setSwapStep(null);
+    setDestTxHash(null);
+
+    const amt = parseFloat(amount);
+    if (!amount || !amt || amt <= 0) {
       setError("Enter a valid amount");
       return;
     }
 
-    const cfSrc = getChainflipAsset(fromChain, fromToken.symbol);
-    const cfDest = getChainflipAsset(toChain, toToken.symbol);
-    if (!cfSrc || !cfDest) {
-      setError("Unsupported asset pair for Chainflip");
+    const limits = LIMITS[fromChain];
+    if (limits) {
+      if (amt < limits.min) { setError(`Minimum amount is ${limits.min} ${fromSymbol}`); return; }
+      if (amt > limits.max) { setError(`Maximum amount is ${limits.max} ${fromSymbol}`); return; }
+    }
+
+    if (fromChain === toChain) {
+      setError("Source and destination must be different");
       return;
     }
 
-    if (fromChain === toChain && fromToken.symbol === toToken.symbol) {
-      setError("Source and destination must be different");
+    const destAddr = addresses[toChain];
+    const refundAddr = addresses[fromChain];
+    if (!destAddr || !refundAddr) {
+      setError("Missing wallet addresses");
       return;
     }
 
     setLoading(true);
     try {
-      const amountBase = parseUnits(amount, fromToken.decimals).toString();
-      const result = await getChainflipQuote(
-        fromChain, fromToken.symbol,
-        toChain, toToken.symbol,
-        amountBase
-      );
-      setQuote(result);
+      const resp = await getCross2ChainQuote(fromChain, toChain, amount, destAddr, refundAddr);
+      setQuoteResponse(resp);
+      setSelectedRoute(resp.recommendedRoute);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to get quote");
     } finally {
       setLoading(false);
     }
-  }, [fromChain, toChain, fromToken, toToken, amount]);
+  }, [fromChain, toChain, amount, addresses, fromSymbol]);
 
   const handleExecute = useCallback(async () => {
-    if (!quote) return;
+    if (!selectedRoute) return;
     const srcAddr = addresses[fromChain];
     const destAddr = addresses[toChain];
     const pk = privateKeys[fromChain];
@@ -226,71 +204,52 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
     setExecuting(true);
     setError(null);
     setTxHash(null);
-    setSwapStep("Requesting deposit address...");
+    setSwapStep("Creating swap...");
 
     try {
-      const amountBase = parseUnits(amount, fromToken.decimals).toString();
-      const deposit = await requestChainflipDeposit(
-        fromChain, fromToken.symbol,
-        toChain, toToken.symbol,
-        amountBase,
-        destAddr,
-        srcAddr,
-        quote.recommendedSlippageTolerancePercent,
-        quote.recommendedRetryDurationMinutes
-      );
+      const swapResult = await createCross2ChainSwap(selectedRoute, destAddr, srcAddr);
+      setSwap(swapResult);
 
-      setChannelId(deposit.depositChannelId);
-      setSwapStep(`Sending ${fromToken.symbol} to deposit address...`);
+      setSwapStep(`Sending ${fromSymbol} to deposit address...`);
 
       let hash: string;
 
       if (isBtcSource) {
         const amountSats = Math.round(parseFloat(amount) * 1e8);
-        hash = await sendBtc(pk, srcAddr, deposit.depositAddress, amountSats, activeFeeRate);
+        const feeRate = swapResult.recommendedGasRate || activeFeeRate;
+        if (swapResult.memo) {
+          hash = await sendBtcWithMemo(pk, srcAddr, swapResult.depositAddress, amountSats, feeRate, swapResult.memo, setSwapStep);
+        } else {
+          hash = await sendBtc(pk, srcAddr, swapResult.depositAddress, amountSats, feeRate);
+        }
       } else {
         const net = allNetworks[fromChain];
-        const chain = EVM_CHAINS[net.chainId] ?? {
-          id: net.chainId,
-          name: net.name,
-          nativeCurrency: net.nativeCurrency,
-          rpcUrls: { default: { http: [net.rpcUrl] } },
-        };
         const account = privateKeyToAccount(pk as Hex);
-        const client = createWalletClient({ account, chain, transport: http(net.rpcUrl) });
-        const tokenAmount = parseUnits(amount, fromToken.decimals);
-
-        if (!fromToken.address) {
-          hash = await client.sendTransaction({
-            to: deposit.depositAddress as Address,
-            value: tokenAmount,
-            chain,
-          });
-        } else {
-          const { writeContract } = await import("viem/actions");
-          const erc20 = (await import("viem")).erc20Abi;
-          hash = await writeContract(client, {
-            address: fromToken.address as Address,
-            abi: erc20,
-            functionName: "transfer",
-            args: [deposit.depositAddress as Address, tokenAmount],
-            chain,
-          });
-        }
+        const client = createWalletClient({
+          account,
+          chain: mainnet,
+          transport: http(net.rpcUrl),
+        });
+        const ethAmount = parseEther(amount);
+        hash = await client.sendTransaction({
+          to: swapResult.depositAddress as Address,
+          value: ethAmount,
+          chain: mainnet,
+        });
       }
 
       setTxHash(hash);
       setSwapStep("Deposit sent! Waiting for confirmations...");
-      startStatusPoll(deposit.depositChannelId);
+      startStatusPoll(swapResult.id);
 
       logSwap({
-        provider: "chainflip",
+        provider: "cross2chain",
         fromChain,
         toChain,
-        fromToken: fromToken.symbol,
-        toToken: toToken.symbol,
+        fromToken: fromSymbol,
+        toToken: toSymbol,
         fromAmount: amount,
-        toAmount: formatChainflipAmount(quote.egressAmount, getChainflipDecimals(toToken.symbol)),
+        toAmount: swapResult.expectedOutput,
         txHash: hash,
         status: "pending",
       });
@@ -300,17 +259,16 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
     } finally {
       setExecuting(false);
     }
-  }, [quote, addresses, privateKeys, fromChain, toChain, fromToken, toToken, amount, isBtcSource, startStatusPoll, activeFeeRate]);
-
-  const outDecimals = getChainflipDecimals(toToken.symbol);
-  const expectedOut = quote ? formatChainflipAmount(quote.egressAmount, outDecimals) : null;
+  }, [selectedRoute, addresses, privateKeys, fromChain, toChain, fromSymbol, toSymbol, amount, isBtcSource, activeFeeRate, startStatusPoll]);
 
   const resetForm = () => {
-    setQuote(null);
+    setQuoteResponse(null);
+    setSelectedRoute(null);
+    setSwap(null);
     setTxHash(null);
-    setChannelId(null);
-    setSwapState(null);
+    setSwapStatus(null);
     setSwapStep(null);
+    setDestTxHash(null);
     if (pollRef.current) clearInterval(pollRef.current);
   };
 
@@ -321,20 +279,11 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
           <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">From</label>
           <select
             value={fromChain}
-            onChange={(e) => { setFromChain(e.target.value); setFromTokenIdx(0); resetForm(); }}
+            onChange={(e) => { setFromChain(e.target.value); resetForm(); }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
             {supportedKeys.map((k) => (
-              <option key={k} value={k}>{allNetworks[k].name}</option>
-            ))}
-          </select>
-          <select
-            value={fromTokenIdx}
-            onChange={(e) => { setFromTokenIdx(Number(e.target.value)); resetForm(); }}
-            className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
-          >
-            {fromTokens.map((t, i) => (
-              <option key={t.symbol} value={i}>{t.label}</option>
+              <option key={k} value={k}>{allNetworks[k]?.name ?? k}</option>
             ))}
           </select>
         </div>
@@ -342,20 +291,11 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
           <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">To</label>
           <select
             value={toChain}
-            onChange={(e) => { setToChain(e.target.value); setToTokenIdx(0); resetForm(); }}
+            onChange={(e) => { setToChain(e.target.value); resetForm(); }}
             className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
           >
             {supportedKeys.map((k) => (
-              <option key={k} value={k}>{allNetworks[k].name}</option>
-            ))}
-          </select>
-          <select
-            value={toTokenIdx}
-            onChange={(e) => { setToTokenIdx(Number(e.target.value)); resetForm(); }}
-            className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
-          >
-            {toTokens.map((t, i) => (
-              <option key={t.symbol} value={i}>{t.label}</option>
+              <option key={k} value={k}>{allNetworks[k]?.name ?? k}</option>
             ))}
           </select>
         </div>
@@ -381,7 +321,7 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
             className="flex-1 px-3 py-2.5 dark:bg-m-blue-dark-2 dark:text-gray-200 font-mono text-sm focus:outline-none min-w-0 border-none"
           />
           <span className="px-3 py-2.5 bg-gray-100 dark:bg-m-blue-dark-2 dark:text-gray-200 text-sm font-bold border-l border-gray-300 dark:border-gray-600">
-            {fromToken.symbol}
+            {fromSymbol}
           </span>
         </div>
         {usdEstimate && <p className="text-xs text-gray-400 mt-1">~${usdEstimate}</p>}
@@ -421,9 +361,7 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
               </div>
             ) : (
               <span>
-                {feeRates
-                  ? `${activeFeeRate} sat/vB`
-                  : "Loading rates..."}
+                {feeRates ? `${activeFeeRate} sat/vB` : "Loading rates..."}
               </span>
             )}
             <span>
@@ -433,22 +371,72 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
         </div>
       )}
 
-      {quote && (
+      {quoteResponse && selectedRoute && (
         <div className="bg-white dark:bg-m-blue-dark-2 border border-gray-200 dark:border-gray-600 rounded-lg p-4 space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Expected output</span>
-            <span className="font-bold font-mono">{expectedOut} {toToken.symbol}</span>
+            <span className="font-bold font-mono">{selectedRoute.expectedOutput} {toSymbol}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Rate</span>
-            <span className="font-mono">{quote.estimatedPrice}</span>
+            <span className="text-gray-500">Minimum output</span>
+            <span className="font-mono text-gray-400">{selectedRoute.minimumOutput} {toSymbol}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Provider</span>
+            <span className="capitalize">{selectedRoute.provider}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Est. time</span>
-            <span>{Math.ceil(quote.estimatedDurationSeconds / 60)} min</span>
+            <span>{quoteResponse.estimatedTimeMinutes} min</span>
           </div>
-          {quote.lowLiquidityWarning && (
-            <p className="text-xs text-yellow-600 dark:text-yellow-400 font-bold">Low liquidity warning</p>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Protection score</span>
+            <span className={`font-bold ${quoteResponse.protectionScore >= 70 ? "text-green-500" : quoteResponse.protectionScore >= 50 ? "text-yellow-500" : "text-red-500"}`}>
+              {quoteResponse.protectionScore}/100
+            </span>
+          </div>
+          {selectedRoute.slippagePercent > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Slippage</span>
+              <span className="font-mono">{selectedRoute.slippagePercent}%</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Fees</span>
+            <span className="font-mono text-xs text-gray-400">
+              net: {selectedRoute.networkFees} / proto: {selectedRoute.protocolFees}
+            </span>
+          </div>
+
+          {quoteResponse.protectionScore < 50 && (
+            <p className="text-xs text-red-500 font-bold">Low protection score — proceed with caution</p>
+          )}
+          {quoteResponse.warnings.length > 0 && (
+            <div className="space-y-0.5">
+              {quoteResponse.warnings.map((w, i) => (
+                <p key={i} className="text-xs text-yellow-600 dark:text-yellow-400">{w}</p>
+              ))}
+            </div>
+          )}
+
+          {quoteResponse.routes.length > 1 && !swap && (
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Route</label>
+              <select
+                value={selectedRoute.quoteId}
+                onChange={(e) => {
+                  const route = quoteResponse.routes.find((r) => r.quoteId === e.target.value);
+                  if (route) setSelectedRoute(route);
+                }}
+                className="mt-1 w-full px-2 py-1.5 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 text-sm"
+              >
+                {quoteResponse.routes.map((r) => (
+                  <option key={r.quoteId} value={r.quoteId}>
+                    {r.provider} — {r.expectedOutput} {toSymbol} ({r.routeLabel})
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
 
           {txHash && (
@@ -460,31 +448,45 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
             </div>
           )}
 
+          {destTxHash && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded p-3">
+              <p className="text-sm font-bold text-green-700 dark:text-green-300 mb-1">Destination TX</p>
+              <p className="font-mono text-xs break-all text-green-600 dark:text-green-400">{destTxHash}</p>
+            </div>
+          )}
+
           {swapStep && (
             <p className="text-xs text-blue-500 dark:text-blue-400 text-center font-medium animate-pulse">{swapStep}</p>
           )}
 
-          {swapState && swapState !== "WAITING" && (
+          {swapStatus && swapStatus !== "waiting_for_deposit" && (
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Swap status</span>
+              <span className="text-gray-500">Status</span>
               <span className={`font-bold text-xs px-1.5 py-0.5 rounded ${
-                swapState === "COMPLETED" || swapState === "SENT"
+                swapStatus === "completed"
                   ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                  : swapState === "FAILED"
+                  : swapStatus === "failed"
                     ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                    : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-              }`}>{swapState}</span>
+                    : swapStatus === "refunded"
+                      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+              }`}>{STATUS_LABELS[swapStatus] ?? swapStatus}</span>
             </div>
           )}
 
-          {channelId && (
+          {swap && (
             <p className="text-[10px] text-gray-400 text-center break-all">
-              Channel: {channelId}
+              Swap ID: {swap.id}
             </p>
           )}
 
           {!txHash && (
             <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3">
+              {isBtcSource && selectedRoute.requiresMemo && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mb-2">
+                  This swap requires an OP_RETURN memo — it will be included automatically.
+                </p>
+              )}
               <button
                 onClick={handleExecute}
                 disabled={executing}
@@ -499,16 +501,16 @@ export default function ChainflipSwapForm({ addresses, privateKeys }: ChainflipS
 
       {error && <p className="text-m-red text-sm">{error}</p>}
 
-      {!quote && (
+      {!quoteResponse && (
         <button
           onClick={handleQuote}
           disabled={loading}
           className="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg text-sm transition-colors disabled:opacity-50"
         >
-          {loading ? "Getting Quote..." : "Get Chainflip Quote"}
+          {loading ? "Getting Quote..." : "Get Quote"}
         </button>
       )}
-      {quote && !channelId && (
+      {quoteResponse && !swap && (
         <button
           onClick={resetForm}
           className="w-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold py-2.5 px-6 rounded-lg text-sm transition-colors"

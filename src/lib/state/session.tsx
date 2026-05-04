@@ -9,8 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
+import { idbGet, idbSet, idbDelete } from "./idb";
 
-const STORAGE_KEY = "w2q_session";
+const SESSION_KEY = "session";
+const VAULT_KEY = "vault";
 
 interface StoredSession {
   mnemonic: string;
@@ -19,29 +21,51 @@ interface StoredSession {
   isDeterministic?: boolean;
 }
 
-function saveToStorage(mnemonic: string, password: string, readOnly: boolean, isDeterministic: boolean) {
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ mnemonic, password, readOnly, isDeterministic } satisfies StoredSession)
-    );
-  } catch {}
+export interface VaultData {
+  rawQrUrl: string;
+  envelope: unknown;
+  version: number;
 }
 
-function loadFromStorage(): StoredSession | null {
+async function saveSession(mnemonic: string, password: string, readOnly: boolean, isDeterministic: boolean) {
+  await idbSet(SESSION_KEY, { mnemonic, password, readOnly, isDeterministic } satisfies StoredSession);
+  // Remove legacy localStorage entry if present
+  try { localStorage.removeItem("w2q_session"); } catch {}
+}
+
+async function loadSession(): Promise<StoredSession | null> {
+  const stored = await idbGet<StoredSession>(SESSION_KEY);
+  if (stored?.mnemonic && typeof stored.password === "string") return stored;
+  // Migrate from localStorage if present
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.mnemonic && typeof parsed.password === "string") return parsed;
+    const raw = localStorage.getItem("w2q_session");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.mnemonic && typeof parsed.password === "string") {
+        await idbSet(SESSION_KEY, parsed);
+        localStorage.removeItem("w2q_session");
+        return parsed;
+      }
+    }
   } catch {}
   return null;
 }
 
-function clearStorage() {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {}
+async function clearSession() {
+  await idbDelete(SESSION_KEY);
+  try { localStorage.removeItem("w2q_session"); } catch {}
+}
+
+export async function saveVault(data: VaultData): Promise<void> {
+  await idbSet(VAULT_KEY, data);
+}
+
+export async function loadVault(): Promise<VaultData | null> {
+  return idbGet<VaultData>(VAULT_KEY);
+}
+
+export async function clearVault(): Promise<void> {
+  await idbDelete(VAULT_KEY);
 }
 
 interface SessionState {
@@ -52,6 +76,7 @@ interface SessionState {
   setSession: (mnemonic: string, password: string, readOnly?: boolean, isDeterministic?: boolean) => void;
   lock: () => void;
   isUnlocked: boolean;
+  hasVault: boolean;
   verifyPassword: (input: string) => boolean;
 }
 
@@ -63,6 +88,7 @@ const SessionContext = createContext<SessionState>({
   setSession: () => {},
   lock: () => {},
   isUnlocked: false,
+  hasVault: false,
   verifyPassword: () => false,
 });
 
@@ -71,18 +97,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [password, setPasswordRaw] = useState<string | null>(null);
   const [readOnly, setReadOnlyRaw] = useState(false);
   const [isDeterministic, setIsDeterministicRaw] = useState(false);
+  const [hasVault, setHasVault] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    const stored = loadFromStorage();
-    if (stored) {
-      setMnemonicRaw(stored.mnemonic);
-      setPasswordRaw(stored.password);
-      setReadOnlyRaw(stored.readOnly ?? false);
-      setIsDeterministicRaw(stored.isDeterministic ?? false);
-    }
-    setHydrated(true);
+    (async () => {
+      const stored = await loadSession();
+      if (stored) {
+        setMnemonicRaw(stored.mnemonic);
+        setPasswordRaw(stored.password);
+        setReadOnlyRaw(stored.readOnly ?? false);
+        setIsDeterministicRaw(stored.isDeterministic ?? false);
+      }
+      const vault = await loadVault();
+      setHasVault(!!vault);
+      setHydrated(true);
+    })();
   }, []);
 
   const lock = useCallback(() => {
@@ -90,7 +121,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPasswordRaw(null);
     setReadOnlyRaw(false);
     setIsDeterministicRaw(false);
-    clearStorage();
+    clearSession();
     router.push("/qr-to-wallet");
   }, [router]);
 
@@ -100,7 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setPasswordRaw(p);
       setReadOnlyRaw(ro);
       setIsDeterministicRaw(det);
-      saveToStorage(m, p, ro, det);
+      saveSession(m, p, ro, det);
     },
     []
   );
@@ -124,6 +155,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setSession,
         lock,
         isUnlocked: !!mnemonic,
+        hasVault,
         verifyPassword,
       }}
     >

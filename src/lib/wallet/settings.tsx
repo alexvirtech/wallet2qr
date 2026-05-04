@@ -121,6 +121,10 @@ function loadSettings(): WalletSettings {
         stored.networks[key] = defaults.networks[key];
       } else {
         const ns = stored.networks[key];
+        const net = allNetworks[key];
+        if (net?.isDefault && !ns.added) {
+          ns.added = true;
+        }
         for (const tkn of Object.keys(defaults.networks[key].tokens)) {
           if (!ns.tokens[tkn]) {
             ns.tokens[tkn] = defaults.networks[key].tokens[tkn];
@@ -128,7 +132,6 @@ function loadSettings(): WalletSettings {
         }
         // Migrate: add accounts array if missing
         if (!ns.accounts || ns.accounts.length === 0) {
-          const net = allNetworks[key];
           const schemeId = ns.schemeId || getDefaultSchemeId(net.chainType);
           const path = ns.derivationPath || resolveTemplate(getScheme(schemeId)!.template, 0);
           ns.accounts = [{ path, label: "Account 1" }];
@@ -264,7 +267,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const removeNetwork = useCallback(
     (key: string) => {
       const next = structuredClone(settings);
-      if (next.networks[key]) next.networks[key].added = false;
+      if (next.networks[key]) {
+        if (allNetworks[key]?.isDefault) {
+          next.networks[key].visible = false;
+        } else {
+          next.networks[key].added = false;
+        }
+      }
       persist(next);
     },
     [settings, persist]
